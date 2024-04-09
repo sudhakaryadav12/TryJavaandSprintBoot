@@ -1,275 +1,184 @@
-<!doctype html>
-<html lang="en" xmlns:th="http://www.thymeLeaf.com">
-  <head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fancy Form and Table</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f0f0f0;
+        margin: 0;
+        padding: 0;
+    }
 
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    .container {
+        max-width: 800px;
+        margin: 20px auto;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        text-align: center;
+    }
 
-    <title>Home page</title>
-    
-    <style>
-  
+    h1 {
+        margin-bottom: 20px;
+    }
 
-  
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&display=swap');
-*{
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: 'Poppins',sans-serif;
-}
+    .form-container {
+        background-color: #e9f2fd;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
 
-.container{
-  max-width: 1100px;
-  width: 100%;
-  background-color: #fff;
-  padding: 5px 30px;
-  border-radius: 5px;
-  box-shadow: 0 5px 10px rgba(0,0,0,0.15);
-}
+    .form-row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 15px;
+    }
 
-.container .title{
-  font-size: 18px;
-  font-weight: 500;
-  position: relative;
-}
-.container .title::before{
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  height: 1px;
-  width: 20px;
-  border-radius: 5px;
-  background: linear-gradient(135deg, #71b7e6, #9b59b6);
-}
-.content form .user-details{
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  margin: 20px 0 12px 0;
-}
-form .user-details .input-box{
-  margin-bottom: 15px;
-  width: calc(100% / 2 - 20px);
-}
-form .input-box span.details{
-  display: block;
-  font-weight: 500;
-  margin-bottom: 5px;
-  font-size: 10px;
-}
-.user-details .input-box input{
-  height: 35px;
-  width: 100%;
-  outline: none;
-  font-size: 10px;
-  border-radius: 5px;
-  padding-left: 15px;
-  border: 1px solid #ccc;
-  border-bottom-width: 2px;
-  transition: all 0.3s ease;
-}
-.user-details .input-box input:focus,
-.user-details .input-box input:valid{
-  border-color: #9b59b6;
-}
- form .gender-details .gender-title{
-  font-size: 20px;
-  font-weight: 500;
- }
- form .category{
-   display: flex;
-   width: 80%;
-   margin: 14px 0 ;
-   justify-content: space-between;
- }
- form .category label{
-   display: flex;
-   align-items: center;
-   cursor: pointer;
- }
- form .category label .dot{
-  height: 10px;
-  width: 10px;
-  border-radius: 50%;
-  margin-right: 10px;
-  background: #d9d9d9;
-  border: 5px solid transparent;
-  transition: all 0.3s ease;
-}
- #dot-1:checked ~ .category label .one,
- #dot-2:checked ~ .category label .two,
- #dot-3:checked ~ .category label .three{
-   background: #9b59b6;
-   border-color: #d9d9d9;
- }
- form input[type="radio"]{
-   display: none;
- }
- form .button{
-   height: 35px;
-   margin: 35px 0
- }
- form .button input{
-   height: 100%;
-   width: 10%;
-   border-radius: 5px;
-   border: none;
-   color: #fff;
-   font-size: 18px;
-   font-weight: 500;
-   letter-spacing: 1px;
-   cursor: pointer;
-   transition: all 0.3s ease;
-   background: linear-gradient(135deg, #71b7e6, #9b59b6);
- }
- form .button input:hover{
-  /* transform: scale(0.99); */
-  background: linear-gradient(-135deg, #71b7e6, #9b59b6);
-  }
- @media(max-width: 584px){
- .container{
-  max-width: 100%;
-}
-form .user-details .input-box{
-    margin-bottom: 15px;
-    width: 100%;
-  }
-  form .category{
-    width: 100%;
-  }
-  .content form .user-details{
-    max-height: 300px;
-    overflow-y: scroll;
-  }
-  .user-details::-webkit-scrollbar{
-    width: 5px;
-  }
-  }
-  @media(max-width: 459px){
-  .container .content .category{
-    flex-direction: column;
-  }
-}
+    .form-row label {
+        margin-right: 10px;
+        font-weight: bold;
+    }
 
+    .form-row select {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+    th, td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: center;
+    }
+
+    th {
+        background-color: #007bff;
+        color: #fff;
+    }
+
+    .delete-btn {
+        background-color: #dc3545;
+        color: #fff;
+        border: none;
+        padding: 6px 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    .submit-btn {
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+    }
 </style>
-
-  </head>
-  <body>
-  
-  
-  
-  
-    <!--navbar -->
-  
-  <nav class="navbar navbar-expand-lg navbar-dark bg-warning">
-  <a class="navbar-brand font-weight-bold  text-dark" href="orggroup">UI Application</a>
-  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-    <span class="navbar-toggler-icon"></span>
-  </button>
-
-  <div class="collapse navbar-collapse" id="navbarSupportedContent">
-   
-  </div>
-</nav>
-  
-  
-  
-      <!--navbar -->
-      
-    <div th:if=${session.msg}>
-     <div class="alert alert-success" role="alert" th:text="${session.msg}">
-    </div>
-    <th:block th:text="${#session.removeAttribute('msg')}"></th:block>
-    </div>
-    
+</head>
+<body>
 <div class="container">
-    <div class="title">LOAD STORM PARAMTERS</div>
-    <div class="content">
-      <form th:action="@{/orggroupregister}" method="post">
-        <div class="user-details">
-          <div class="input-box">
-            <span class="details">Storm Data</span>
-            <input type="text" placeholder="" required name="groupname">
-          </div>
-          <div class="input-box">
-            <span class="details"># of Ticket Per Hour</span>
-            <input type="text" placeholder="" required>
-          </div>
-          <div class="input-box">
-            <span class="details">Max Ticket to load</span>
-            <input type="text" placeholder="" required name="grouptype">
-          </div>
-          <div class="input-box">
-            <span class="details">Use Current Data/time</span>
-            <input type="text" placeholder="" required name="country">
-          </div>
-          <div class="input-box">
-            <span class="details">Regions to load</span>
-            <input type="text" placeholder="" required name="locale">
-          </div>
-          <div class="input-box">
-            <span class="details">Clear Environment</span>
-            <input type="text" placeholder="" required name="timezone">
-          </div>
-          <div class="input-box">
-            <span class="details">Load Start Date/Time</span>
-            <input type="text" placeholder="" required name="timezone">
-          </div>
+    <h1>LOAD STORM PARAMTERS</h1>
+    <div class="form-container">
+        <div class="form-row">
+            <label for="dropdown1">Storm Data:</label>
+            <select id="dropdown1" name="dropdown1">
+			    <option value="d" selected>Select a storm data ...</option>
+                <option value="option1">Option 1</option>
+                <option value="option2">Option 2</option>
+                <option value="option3">Option 3</option>
+            </select>
         </div>
-        
-        <div class="button">
-          <input type="submit" value="Add">
+        <div class="form-row">
+            <label for="dropdown2"># of Ticket Per Hour:</label>
+            <select id="dropdown2" name="dropdown2">
+                <option value="option1">1000</option>
+                <option value="option2">2000</option>
+                <option value="option3">3000</option>
+            </select>
         </div>
-      </form>
+        <div class="form-row">
+            <label for="dropdown3">Max Ticket to load:</label>
+            <select id="dropdown3" name="dropdown3">
+                 <option value="option1">1000</option>
+                <option value="option2">2000</option>
+                <option value="option3">3000</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label for="dropdown4">Use Current Data/time:</label>
+            <select id="dropdown4" name="dropdown4">
+                <option value="option1" selected>Yes</option>
+                <option value="option2">No</option>
+               
+            </select>
+        </div>
+        <div class="form-row">
+            <label for="dropdown5">Regions to load:</label>
+            <select id="dropdown5" name="dropdown5">
+                <option value="option1" selected>ALL</option>
+                <option value="option2">No</option>
+                <option value="option3">Option 3</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label for="dropdown6">Clear Environment:</label>
+            <select id="dropdown6" name="dropdown6">
+                <option value="option1" selected>No</option>
+                <option value="option2">Yes</option>
+                
+            </select>
+        </div>
+        <div class="form-row">
+            <label for="datetime">Load Start Date/Time:</label>
+            <input type="datetime-local" id="datetime" name="datetime">
+        </div>
+        <div class="form-row">
+            <button type="submit" class="submit-btn">Submit</button>
+        </div>
     </div>
-  </div>
-    
-      
-<div class="container p-5">
-     
-
-<table class="table table-striped">
-  <thead class="bg-warning text-white">
-    <tr >
-     <!--  <th scope="col">ID</th>-->
-      <th scope="col">Name</th>
-      <th scope="col">Group ID</th>
-      <th scope="col">Type</th>
-      <th scope="col">Country</th>
-      <th scope="col">Locale</th>
-       <th scope="col">Time Zone</th>
-       <th scope="col">Action</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr th:each="e: ${emp}">
-       <!--  <th  th:text="${e.id}"></th>-->
-      <td th:text="${e.groupname}"></td>
-      <td th:text="${e.id}"></td>
-      <td th:text="${e.grouptype}"></td>
-      <td th:text="${e.country}"></td>
-      <td th:text="${e.locale}"></td>
-      <td th:text="${e.timezone}"></td>
-       <td >
-         <a class="btn btn-sm btn-warning" th:href="@{/orggroupedit/{id}(id=${e.id})}">Edit</a>
-        <a class="btn btn-sm btn-danger" th:href="@{/orggroupdelete/{id}(id=${e.id})}">Delete</a>
-        </td>
-      
-    </tr>
-    
-  </tbody>
-</table>
-      </div>
-
-    <!-- Optional JavaScript -->
-    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
-    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
-  </body>
+    <table>
+        <thead>
+            <tr>
+                <th>Action</th>
+                <th>Start Timestamp</th>
+                <th>Storm Name</th>
+                <th>Status</th>
+                <th>Requested By</th>
+                <th>Rate Per Hour</th>
+                <th>Use Current Date/Time</th>
+                <th>Total Tkts</th>
+				<th>Region</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><button class="delete-btn">Delete</button></td>
+                <td>Data 1</td>
+                <td>Data 2</td>
+                <td>Data 3</td>
+                <td>Data 4</td>
+                <td>Data 5</td>
+                <td>Data 6</td>
+                <td>Data 7</td>
+				 <td>Data 8</td>
+            </tr>
+            <!-- Add more rows here if needed -->
+        </tbody>
+    </table>
+</div>
+</body>
 </html>
