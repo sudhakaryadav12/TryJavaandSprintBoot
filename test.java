@@ -7,6 +7,7 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,6 +47,8 @@ public class PostgresDateTimeUpdater {
         String selectQuery = "SELECT id, " + column + " FROM " + tableName;
         String updateQuery = "UPDATE " + tableName + " SET " + column + " = ? WHERE id = ?";
 
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(selectQuery);
              PreparedStatement pstmt = conn.prepareStatement(updateQuery)) {
@@ -57,7 +60,10 @@ public class PostgresDateTimeUpdater {
                 ZonedDateTime zonedDateTime = dateTime.atZone(ZoneId.of("UTC"));
                 ZonedDateTime easternTime = zonedDateTime.withZoneSameInstant(ZoneId.of("America/New_York"));
 
-                pstmt.setTimestamp(1, java.sql.Timestamp.valueOf(easternTime.toLocalDateTime()));
+                String formattedDateTime = easternTime.format(formatter);
+                LocalDateTime parsedDateTime = LocalDateTime.parse(formattedDateTime, formatter);
+
+                pstmt.setTimestamp(1, java.sql.Timestamp.valueOf(parsedDateTime));
                 pstmt.setInt(2, id);
                 pstmt.executeUpdate();
             }
