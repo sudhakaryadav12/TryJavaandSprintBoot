@@ -47,6 +47,25 @@ public class DateTimeUpdater {
         return Timestamp.valueOf(easternTime);
     }
 
+     public static void main1(String[] args) {
+        // Sample timestamp
+        Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+        
+        // Convert Timestamp to ZonedDateTime in UTC
+        ZonedDateTime utcZonedDateTime = timestamp.toInstant().atZone(ZoneId.of("UTC"));
+        
+        // Convert UTC ZonedDateTime to Eastern Time Zone
+        ZonedDateTime easternZonedDateTime = utcZonedDateTime.withZoneSameInstant(ZoneId.of("America/New_York"));
+        
+        // Format the date-time in a readable format
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z");
+        String formattedDateTime = easternZonedDateTime.format(formatter);
+        
+        // Output the formatted date-time
+        System.out.println("Original Timestamp: " + timestamp);
+        System.out.println("Eastern Time Zone: " + formattedDateTime);
+    }
+
     public static void main(String[] args) {
         // Example usage
         DriverManagerDataSource dataSource = new DriverManagerDataSource();
