@@ -1,8 +1,13 @@
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-import com.example.api.service.FISService;
-import com.example.api.service.FileHandlerService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
 
 @RestController
 @RequestMapping("/api")
@@ -13,6 +18,18 @@ public class APIController {
 
     @Autowired
     private FileHandlerService fileHandlerService;
+    
+    @PostMapping(value = "/upload", consumes = {"multipart/form-data"})
+    public ResponseEntity<String> uploadFileAndJson(
+            @RequestPart("file") MultipartFile file,
+            @RequestPart("data") String json) {
+        try {
+        	fisService.processFileAndJson(file, json);
+            return ResponseEntity.ok("File and JSON processed successfully");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
 
     // Endpoint for FIS API
     @PostMapping("/fis")
