@@ -1,0 +1,45 @@
+Audit Log API Overview
+
+Introduction
+This document provides an overview of the Audit Log API and its interaction with different components. The API is designed to log and store audit-related data 
+such as sessions, user activities, activities, and users. The data flow involves an SQS queue, a handler service, and an API for persisting logs to a database.
+
+Architecture Overview
+
+SQS Queue
+Queue Name:comob-aite-ue1-sqs-auditLogprimary.fifo`
+The queue acts as an intermediary message broker that receives audit log messages.
+
+Message Flow
+Source:Mobile experience service generates a string message and sends it to the SQS queue.
+SQS Processing: A handler service reads messages from the queue.
+Handler Processing: The handler calls the Audit Log API to store the audit data.
+Audit Log API: Responsible for processing and storing audit-related information into the database.
+
+#Audit Log Data Structure
+The API records the following types of data:
+Sessions
+User Activities
+Activities
+Users
+
+Audit Report Database
+The audit report is stored in a database
+
+
+Audit Log API
+Endpoint:`/auditlogapi`
+Method:`POST`
+Functionality: Records audit log data into the database.
+
+This API implementation ensures a structured approach to audit logging, leveraging SQS for message processing and a dedicated Audit Log API for storing data. 
+The setup provides reliable and efficient audit tracking for mobile experiences.
+
+
+========================================================================================================
+
+Question : so through sqs are we using any other url before calling the prd url, or are we directly calling th eprd url
+. please give some details on this
+
+Answer : SQS handler reads messages from the queue and directly calls the Audit Log API (/auditlogapi) to record data into the database.
+
