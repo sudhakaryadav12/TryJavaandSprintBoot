@@ -1,0 +1,153 @@
+@PostMapping(API_ENDPOINT_REQUEST_MAPPING_V2_AUTHENTICATE)
+    @Operation(summary = "AuthUser")
+    public  ResponseEntity<SignOn> authUser(@RequestBody UserRequestDto userRequestDto,HttpServletRequest request,
+                                 HttpServletResponse response,@AuthenticationPrincipal Jwt jwt) {
+ 
+        final Map<String, Object> mapObject = new HashMap<>();
+        LOG.info("Cloud testing AuthUser() ==> Before getting userProfile details");
+        final UserProfile userProfile = WebUtil.getUserDetails(userRequestDto,jwt);
+        SignOn signOn = new SignOn();
+        try {
+            LOG.info("Cloud testing AuthUser() ==> Before getting saveUUID");
+            //SessionTracker.saveUUID(request, response);
+            LOG.info("Cloud testing AuthUser() ==> After getting saveUUID");
+            // Change ends
+ 
+            signOn.setStatus(SUCCESS);
+ 
+            mapObject.put(MAP_OBJECT, signOn);
+ 
+            UserAuditLogFactory.getInstance().successfulAuthentication(
+                    request.getRemoteAddr(),
+                    userProfile.deviceInfoVO.getMobileClient(),
+                    userProfile.deviceInfoVO.getOsVersion(),
+                    userProfile.appInfoVO.getAppName(),
+                    userProfile.appInfoVO.getAppVersion(),
+					userProfile.deviceInfoVO.getPf(),
+					userProfile.getUserId());
+ 
+        } catch (Exception e) {
+            LOG.error("Cloud testing AuthUser() ==> After Exception catch: {}", e.getMessage());
+            LOG.error("Session generating Exception " + e);
+        }
+        final ResponseEntity<SignOn> result = ResponseEntity.ok(signOn);
+        LOG.debug("authUser()--> Exit Point result: {} Platform: {}", result, request.getParameter("pf"));
+        return result;
+    }
+ 
+ 
+ 
+ ========================================================================================================================================
+ 
+ public static UserDetails getRequestUserDetails(
+			final HttpServletRequest request,Jwt jwt) {
+ 
+		String userID = null;
+		String mobClient = null;
+		String imeiNo = null;
+		String osVersion = null;
+		String appVersion = null;
+		String appName = null;
+		String devModel = null;
+		String devToken = null;
+		String changeNo = null;
+		String incidentNo = null;
+		String password = null;
+ 
+		final UserDetails userDetails = new UserDetails();
+		final DeviceInfoVO deviceInfoVO = new DeviceInfoVO();
+		final AppInfoVO appInfoVO = new AppInfoVO();
+ 
+		//userID = request.getParameter(ApplicationConstants.USERID);
+		userID = jwt.getClaimAsString(ApplicationConstants.USERID);
+		if (userID == null || "".equals(userID.trim())) {
+			userID = request.getHeader(ApplicationConstants.USERID);
+		}
+ 
+		mobClient = jwt.getClaimAsString(ApplicationConstants.MOBILE_CLIENT);
+		if (mobClient == null || "".equals(mobClient.trim())) {
+			mobClient = request.getHeader(ApplicationConstants.MOBILE_CLIENT);
+		}
+ 
+		imeiNo = jwt.getClaimAsString(ApplicationConstants.IMEI_NUMBER);
+		if (imeiNo == null || "".equals(imeiNo.trim())) {
+			imeiNo = request.getHeader(ApplicationConstants.IMEI_NUMBER);
+		}
+ 
+		osVersion = jwt.getClaimAsString(ApplicationConstants.OS_VERSION);
+		if (osVersion == null || "".equals(osVersion.trim())) {
+			osVersion = request.getHeader(ApplicationConstants.OS_VERSION);
+		}
+ 
+		appVersion = jwt.getClaimAsString(ApplicationConstants.VERSION_NO);
+		if (appVersion == null || "".equals(appVersion.trim())) {
+			appVersion = request.getHeader(ApplicationConstants.VERSION_NO);
+		}
+ 
+		appName = jwt.getClaimAsString(ApplicationConstants.APP_NAME);
+		if (appName == null || "".equals(appName.trim())) {
+			appName = request.getHeader(ApplicationConstants.APP_NAME);
+		}
+ 
+		devToken = jwt.getClaimAsString(ApplicationConstants.DEVICE_TOKEN);
+		if (devToken == null || "".equals(devToken.trim())) {
+			devToken = request.getHeader(ApplicationConstants.DEVICE_TOKEN);
+		}
+ 
+		devModel = jwt.getClaimAsString(ApplicationConstants.DEVICE_MODEL);
+		if (devModel == null || "".equals(devModel.trim())) {
+			devModel = request.getHeader(ApplicationConstants.DEVICE_MODEL);
+		}
+ 
+		changeNo = jwt.getClaimAsString(ApplicationConstants.CHANGE_NO);
+		if (changeNo == null || "".equals(changeNo.trim())) {
+			changeNo = request.getHeader(ApplicationConstants.CHANGE_NO);
+		}
+ 
+		incidentNo = jwt.getClaimAsString(ApplicationConstants.INCIDENT_NO);
+		if (incidentNo == null || "".equals(incidentNo.trim())) {
+			incidentNo = request.getHeader(ApplicationConstants.INCIDENT_NO);
+		}
+ 
+ 
+		password = jwt.getClaimAsString(ApplicationConstants.URI_PARAM_PWD);
+		if (password == null || "".equals(password.trim())) {
+			password = request.getHeader(ApplicationConstants.URI_PARAM_PWD);
+		}
+	
+ 
+		deviceInfoVO.setMobileClient(mobClient);
+		deviceInfoVO.setImeiNumber(imeiNo);
+		deviceInfoVO.setOsVersion(osVersion);
+		deviceInfoVO.setDeviceModel(devModel);
+		deviceInfoVO.setDeviceToken(devToken);
+ 
+		appInfoVO.setAppName(appName);
+		appInfoVO.setAppVersion(appVersion);
+		appInfoVO.setChannelId(ApplicationConstants.BOD_CHNNL_ID);
+		userDetails.setAppInfoVO(appInfoVO);
+		userDetails.setDeviceInfoVO(deviceInfoVO);
+		userDetails.setUserId(userID);
+		userDetails.setChangeNo(changeNo);
+		userDetails.setIncidentNo(incidentNo);
+		userDetails.setPassword(password);
+		
+		return userDetails;
+	}
+ 
+	public static HttpSession getActiveSession(final HttpServletRequest request)
+			throws Exception {
+		HttpSession activeSession = null;
+		String sessionID = "";
+		activeSession = request.getSession(false);
+		if (activeSession == null) {
+			throw new Exception();
+		} else {
+			sessionID = activeSession.getId();
+			if (LOG.isInfoEnabled()) {
+				LOG.info("Existing session Id" + sessionID);
+			}
+		}
+		return activeSession;
+	}
+}
