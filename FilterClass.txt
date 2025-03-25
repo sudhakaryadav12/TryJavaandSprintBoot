@@ -1,0 +1,93 @@
+public class SessionTrackingFilter implements Filter {
+ 
+	private static NeutralizingOutputLogger logger = NeutralizingOutputLogger.getLogger(SessionTrackingFilter.class);
+	/**
+	 * @see Filter#destroy()
+	 */	
+	 
+	private final JwtDecoder jwtDecoder;
+
+    public SessionTrackingFilter(String jwkSetUri) {
+        this.jwtDecoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+    }
+	
+	@Override
+	public void destroy() {
+		// TODO Auto-generated method stub
+	}
+ 
+	/**
+	 * @see Filter#doFilter(ServletRequest, ServletResponse, FilterChain)
+	 */
+	@Override
+	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+		// TODO Auto-generated method stub
+		
+		// pass the request along the filter chain
+		HttpServletRequest httpRequest = (HttpServletRequest) request;
+		HttpServletResponse httpResponse = (HttpServletResponse) response;
+		HttpSession session = httpRequest.getSession(false);
+		
+		  try {
+            String token = extractJwtFromRequest(httpRequest);
+            if (token != null) {
+                Jwt jwt = jwtDecoder.decode(token);
+                UserProfile userProfile = WebUtil.getJwtRequestUserDetails(httpRequest, jwt);
+
+                // Store UserProfile in ThreadLocal storage
+                UserProfileContext.setUserProfile(userProfile);
+                
+                // Save user authentication to SecurityContext
+                SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+
+                logger.info("JWT Authentication Successful for user: {}", userProfile.getUserId());
+            } else {
+                logger.warn("JWT token is missing in the request");
+            }
+        } catch (JwtException e) {
+            logger.error("Invalid JWT token: {}", e.getMessage());
+            httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized: Invalid JWT");
+            return;
+        }
+		
+		logger.debug("Cloud testing ==  Inside Session Tracker Filter.doFilter");
+		String methodName = request.getParameter(ApplicationConstants.METHOD_NAME);
+		// methodName=healthcheck appears to be /healthz. Why was this not changed?
+		if (!ApplicationConstants.AUTH_USER.equalsIgnoreCase(methodName) && !ApplicationConstants.METHOD_NAME_HEALTHCHECK.equalsIgnoreCase(methodName)) {
+			logger.debug("Cloud testing ==  Inside Session Tracker Filter => methodName " + methodName);
+			Cookie cookie = WebUtils.getCookie(httpRequest,
+					SessionTracker.SESSION_TRACK_COOKIE_NAME);
+			logger.debug("SessionTrackingFilter-Cookie Value"
+					+ WebUtils.getCookie(httpRequest,
+							SessionTracker.SESSION_TRACK_COOKIE_NAME));
+			if (!SessionTracker.validateUUID(session, cookie, httpRequest)) {
+ 
+				logger.debug("Cloud testing == unable to validate UUID, call2STF.rsConn");
+				SessionTracker.resetConnection(cookie, session, httpRequest,
+						httpResponse);
+ 
+			}
+		}
+		chain.doFilter(request, response);
+	}
+ 
+	/**
+	 * @see Filter#init(FilterConfig)
+	 */
+	@Override
+	public void init(FilterConfig fConfig) throws ServletException {
+		// TODO Auto-generated method stub
+		
+		
+	}
+	
+	  private String extractJwtFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
+    }
+ 
+}
+ 

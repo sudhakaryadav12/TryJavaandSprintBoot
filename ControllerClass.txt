@@ -1,0 +1,39 @@
+@GetMapping(value = { "/processRequest", "/processRequest.do" }, params = {"methodName=authUser"})
+    public ModelAndView authUser(HttpServletRequest request,
+                                 HttpServletResponse response) {
+ 
+        final Map<String, Object> mapObject = new HashMap<>();
+		UserProfile userProfile = UserProfileContext.getUserProfile();
+		if(userProfile == null)
+		{
+		  userProfile =  WebUtil.getRequestUserDetails(request,jwt);
+		}
+        //final  UserProfile userProfile =  WebUtil.getJwtRequestUserDetails(request,jwt);
+        try {
+            LOG.info("authUser: before getting saveUUID");
+            SessionTracker.saveUUID(request, response);
+            LOG.info("authUser: after getting saveUUID");
+            // Change ends
+            SignOn signOn = new SignOn();
+ 
+            signOn.setStatus(SUCCESS);
+ 
+            mapObject.put(MAP_OBJECT, signOn);
+ 
+            UserAuditLogFactory.getInstance().successfulAuthentication(
+                    request.getRemoteAddr(),
+                    userProfile.deviceInfoVO.getMobileClient(),
+                    userProfile.deviceInfoVO.getOsVersion(),
+                    userProfile.appInfoVO.getAppName(),
+                    userProfile.appInfoVO.getAppVersion(),
+					userProfile.deviceInfoVO.getPf(),
+					userProfile.getUserId());
+ 
+        } catch (Exception e) {
+            LOG.error("Cloud testing AuthUser() ==> After Exception catch: {}", e.getMessage());
+            LOG.error("Session generating Exception " + e);
+        }
+        final ModelAndView result = new ModelAndView(VIEW, mapObject);
+        LOG.debug("authUser()--> Exit Point result: {} Platform: {}", result, request.getParameter("pf"));
+        return result;
+    }
