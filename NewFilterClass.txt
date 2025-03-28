@@ -1,0 +1,72 @@
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+import java.io.IOException;
+import com.microsoft.aad.adal4j.AuthenticationResult;
+import com.microsoft.aad.adal4j.AuthenticationContext;
+import com.microsoft.aad.adal4j.ClientCredential;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+@Component
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+
+    private final JwtDecoder jwtDecoder;
+    
+    
+    public JwtAuthenticationFilter(String jwkSetUri) {
+		 this.jwtDecoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+    }
+	
+
+    
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+        
+        String token = extractToken(request);
+        
+        if (token != null) {
+     
+                 Jwt jwt = jwtDecoder.decode(token);
+                UserProfile userProfile = WebUtil.getJwtRequestUserDetails(httpRequest, jwt);
+                
+                UserDetails userDetails = User.builder()
+                        .username(userProfile.getUsername())
+                        .password("") // No password needed for JWT
+                        .authorities("USER") // Set appropriate roles if needed
+                        .build();
+                
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                authentication.setDetails(userProfile);
+                
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            
+        }
+        
+        filterChain.doFilter(request, response);
+    }
+    
+    private String extractToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        return null;
+    }
+}
+
+
+
+

@@ -3,7 +3,10 @@
                                  HttpServletResponse response) {
  
         final Map<String, Object> mapObject = new HashMap<>();
-		UserProfile userProfile = UserProfileContext.getUserProfile();
+		
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		UserProfile userProfile = (UserProfile) authentication.getDetails();
 		if(userProfile == null)
 		{
 		  userProfile =  WebUtil.getRequestUserDetails(request,jwt);

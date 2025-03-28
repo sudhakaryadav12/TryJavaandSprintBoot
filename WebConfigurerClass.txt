@@ -1,0 +1,99 @@
+
+package com.bbt.mappbmob.config;
+ 
+import com.bbt.mappbmob.SessionTrackingFilter;
+import com.bbt.mappbmob.UserProfileFilter;
+import org.apache.catalina.filters.RequestDumperFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
+import org.springframework.boot.web.servlet.ServletContextInitializer;
+import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.filter.ShallowEtagHeaderFilter;
+ 
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.FilterRegistration;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import java.util.EnumSet;
+ 
+/**
+* Configuration of web application with Servlet 3.0 APIs.
+*/
+@Configuration
+public class WebConfigurer implements ServletContextInitializer, WebServerFactoryCustomizer<ConfigurableServletWebServerFactory> {
+    private final Logger log = LoggerFactory.getLogger(WebConfigurer.class);
+ 
+    private final ApplicationProperties applicationProperties;
+ 
+    @Autowired
+    public WebConfigurer(ApplicationProperties applicationProperties) {
+        this.applicationProperties = applicationProperties;
+    }
+ 
+    @Override
+    public void onStartup(ServletContext servletContext) throws ServletException {
+        EnumSet<DispatcherType> disps = EnumSet.of(DispatcherType.REQUEST, DispatcherType.FORWARD, DispatcherType.ASYNC);
+ 
+        if (applicationProperties.getFilters().isRequestDumperFilterEnabled()) {
+            initRequestDumperFilter(servletContext, disps);
+        }
+        if (applicationProperties.getFilters().isUserProfileFilterEnabled()) {
+            initUserProfileFilter(servletContext, disps);
+        }
+        if (applicationProperties.getFilters().isSessionTrackingFilterEnabled()) {
+            initSessionTrackingFilter(servletContext, disps);
+        }
+		 if (applicationProperties.getFilters().isJwtAuthenticationFilterEnabled()) {
+            initJwtAuthenticationFilter(servletContext, disps);
+        }
+        if (applicationProperties.getFilters().isEtagFilterEnabled()) {
+            initEtagFilter(servletContext, disps);
+        }
+        //changes
+        servletContext.getSessionCookieConfig().setHttpOnly(true);
+        servletContext.getSessionCookieConfig().setSecure(true);
+    }
+ 
+    @Override
+    public void customize(ConfigurableServletWebServerFactory factory) {
+        // empty implementation
+    }
+ 
+    private void initRequestDumperFilter(ServletContext servletContext, EnumSet<DispatcherType> dispatcherTypes) {
+        FilterRegistration.Dynamic requestDumperFilter = servletContext.addFilter("requestDumperFilter", new RequestDumperFilter());
+ 
+        requestDumperFilter.addMappingForUrlPatterns(dispatcherTypes, true, "/*");
+        requestDumperFilter.setAsyncSupported(true);
+    }
+ 
+    private void initUserProfileFilter(ServletContext servletContext, EnumSet<DispatcherType> disps) {
+        FilterRegistration.Dynamic userProfileFilter = servletContext.addFilter("userProfileFilter", new UserProfileFilter());
+ 
+        userProfileFilter.addMappingForUrlPatterns(disps, true,"/*");
+        userProfileFilter.setAsyncSupported(true);
+    }
+ 
+    private void initSessionTrackingFilter(ServletContext servletContext, EnumSet<DispatcherType> disps) {
+        FilterRegistration.Dynamic sessionTrackingFilter = servletContext.addFilter("sessionTrackingFilter", new SessionTrackingFilter(""));
+ 
+        sessionTrackingFilter.addMappingForUrlPatterns(disps, true,"/*");
+        sessionTrackingFilter.setAsyncSupported(true);
+    }
+	
+	private void initJwtAuthenticationFilter(ServletContext servletContext, EnumSet<DispatcherType> disps) {
+        FilterRegistration.Dynamic jwtAuthenticationFilter = servletContext.addFilter("jwtAuthenticationFilter", new JwtAuthenticationFilter(""));
+ 
+        jwtAuthenticationFilter.addMappingForUrlPatterns(disps, true,"/*");
+        jwtAuthenticationFilter.setAsyncSupported(true);
+    }
+ 
+    private void initEtagFilter(ServletContext servletContext, EnumSet<DispatcherType> disps) {
+        FilterRegistration.Dynamic etagFilter = servletContext.addFilter("etagFilter", new ShallowEtagHeaderFilter());
+ 
+        etagFilter.addMappingForUrlPatterns(disps, true,"/*");
+        etagFilter.setAsyncSupported(true);
+    }
+}
