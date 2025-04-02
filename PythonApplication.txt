@@ -1,0 +1,90 @@
+from flask import Flask
+from confluent_kafka import Consumer, KafkaError
+import json
+import threading
+import requests
+
+app = Flask(__name__)
+
+# Kafka Consumer Configuration
+KAFKA_BROKER = "localhost:9092"
+KAFKA_TOPIC = "your_topic"
+KAFKA_GROUP_ID = "flask_consumer_group"
+
+consumer_config = {
+    'bootstrap.servers': KAFKA_BROKER,
+    'group.id': KAFKA_GROUP_ID,
+    'auto.offset.reset': 'earliest'
+}
+
+consumer = Consumer(consumer_config)
+consumer.subscribe([KAFKA_TOPIC])
+
+# API Endpoints (Replace with actual URLs)
+PRODUCT_LOOKUP_API = "http://example.com/getProductId?upc={}"  # Get product ID from UPC
+RELATED_UPS_API = "http://example.com/getRelatedUPS?product_id={}"  # Get related UPS data from product ID
+ITEM_HISTORY_API = "http://example.com/getItemHistory?ups={}"  # Get item history for UPS
+
+def get_product_id(upc):
+    response = requests.get(PRODUCT_LOOKUP_API.format(upc))
+    if response.status_code == 200:
+        return response.json().get("product_id")
+    return None
+
+def get_related_upcs(product_id):
+    response = requests.get(RELATED_UPS_API.format(product_id))
+    if response.status_code == 200:
+        return response.json().get("related_ups")
+    return None
+
+def get_item_history(ups):
+    response = requests.get(ITEM_HISTORY_API.format(ups))
+    if response.status_code == 200:
+        return response.json().get("item_history")
+    return None
+
+def consume_messages():
+    while True:
+        msg = consumer.poll(1.0)  # Poll every second
+        if msg is None:
+            continue
+        if msg.error():
+            if msg.error().code() == KafkaError._PARTITION_EOF:
+                continue
+            else:
+                print(f"Error: {msg.error()}")
+                break
+        
+        event_data = json.loads(msg.value().decode('utf-8'))
+        print(f"Received event: {json.dumps(event_data, indent=2)}")
+        
+        # Extract UPC from event data
+        upc = event_data.get("upc")
+        if upc:
+            product_id = get_product_id(upc)
+            if product_id:
+                print(f"UPC: {upc}, Product ID: {product_id}")
+                related_upcs = get_related_upcs(product_id)
+                if related_upcs:
+                    print(f"Related UPC Data: {json.dumps(related_upcs, indent=2)}")
+                    
+                    # Fetch item history for each UPS
+                    for upc in related_upcs:
+                        item_history = get_item_history(upc)
+                        print(f"UPS: {upc}, Item History: {json.dumps(item_history, indent=2) if item_history else 'No history found'}")
+                else:
+                    print("No related UPS found")
+            else:
+                print("Product ID not found")
+        else:
+            print("UPC not found in event data")
+
+@app.route('/')
+def home():
+    return "Kafka Event Listener Running!"
+
+if __name__ == '__main__':
+    # Run Kafka Consumer in a separate thread
+    threading.Thread(target=consume_messages, daemon=True).start()
+    # Start Flask App
+    app.run(host='0.0.0.0', port=5000, debug=True)
