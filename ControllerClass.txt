@@ -1,17 +1,9 @@
 @GetMapping(value = { "/processRequest", "/processRequest.do" }, params = {"methodName=authUser"})
     public ModelAndView authUser(HttpServletRequest request,
-                                 HttpServletResponse response) {
+                                 HttpServletResponse response,@CurrentUser UserProfile user) {
  
-        final Map<String, Object> mapObject = new HashMap<>();
-		
-		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-		UserProfile userProfile = (UserProfile) authentication.getDetails();
-		if(userProfile == null)
-		{
-		  userProfile =  WebUtil.getRequestUserDetails(request,jwt);
-		}
-        //final  UserProfile userProfile =  WebUtil.getJwtRequestUserDetails(request,jwt);
+        final Map<String, Object> mapObject = new HashMap<>();		
+	
         try {
             LOG.info("authUser: before getting saveUUID");
             SessionTracker.saveUUID(request, response);
