@@ -1,0 +1,150 @@
+
+API Structure
+
+{
+  "filters": {
+    // ItemStatusEnum: [ALL, PUBLISHED, UNPUBLISHED, STAGE, IN_PROGRESS, SYSTEM_PROBLEM, READY_TO_PUBLISH]
+    "itemStatus": "PUBLISHED",
+
+    // LifeCycleStatusEnum: [ACTIVE, RETIRED, ARCHIVED]
+    "lifeCycle": "ACTIVE",
+
+    // BuyBoxEligible: [YES, NO]
+    "buyBoxEligible": "YES",
+
+    "isInDemand": true,
+
+    // FulfillmentEnum values not defined in schema, assumed ["FBM", "FBA"]
+    "fulfillmentType": ["FBM", "FBA"],
+
+    // StatusChangeReasonCodeEnum:
+    // [START_DATE, END_DATE, PRODUCT_NOT_ACTIVE, SALES_UNAUTHORIZATION, PRICEPARITY_NOT_SATISFIED,
+    // REASONABLE_PRICE_NOT_SATISFIED, PRIMARY_IMAGE_MISSING, FORCED, TNS_BLOCK, TNS_RESPONSE,
+    // NO_ACTIVE_DISTR, LEGACY_PARTNER_RETIREMENT, NO_LOGISTICS_DATA, IB_CATEGORY_MISSING,
+    // PARTNER_INACTIVE, UNASSIGNED_TAX_CODE, NO_PRICE, SHIPPING_INFO_MISSING]
+    "statusChangeReason": [
+      "START_DATE",
+      "PRODUCT_NOT_ACTIVE",
+      "NO_PRICE"
+    ],
+
+    // ConditionEnum:
+    // [NEW, NEW_WITHOUT_BOX, NEW_WITHOUT_TAGS, RESTORED_PREMIUM, RESTORED_LIKE_NEW,
+    // RESTORED_GOOD, RESTORED_FAIR, REMANUFACTURED, OPEN_BOX, PRE_OWNED_LIKE_NEW,
+    // PRE_OWNED_GOOD, PRE_OWNED_FAIR, NEW_WITH_DEFECTS]
+    "condition": [
+      "NEW",
+      "OPEN_BOX",
+      "PRE_OWNED_GOOD"
+    ],
+
+    // offerCondition is [Int], assuming mapped to integer codes (e.g. 1 = NEW, 2 = USED, etc.)
+    "offerCondition": [1, 2, 3],
+
+    "pageViewsFilter": {
+      "min": 100,
+      "max": 1000
+    },
+    "currentPrice": {
+      "min": 20,
+      "max": 200
+    },
+
+    "repricerStrategy": {
+      "strategyType": "DYNAMIC",
+      "strategyCollectionName": "TopSellerCollection",
+      "strategyStatus": "ACTIVE"
+    }
+  },
+  "sorts": {
+    // Example sort fields: PAGE_VIEWS, PRICE, etc. (Assumed)
+    "sortField": "PAGE_VIEWS",
+    "sortOrder": "DESC"
+  },
+  "search": {
+    // Example search fields: ITEM_NAME, SKU, etc. (Assumed)
+    "searchField": "ITEM_NAME",
+    "searchValue": "Wireless Mouse"
+  },
+  "pagination": {
+    "offset": 0,
+    "limit": 25
+  }
+}
+
+
+Below are the validations
+
+Request body must contain at least one of: filters , search.Sort is optional
+Each of filters, sorts, and search (if present) must be of type object.
+
+---
+
+2.Filters Validations
+
+a. Enum Fields
+
+itemStatus,lifeCycle,buyBoxEligible must be one of their respective allowed enum values.
+isInDemand` must be a boolean.
+
+b. Array Fields
+
+fulfillmentType,statusChangeReason,condition must be arrays of valid enum strings.
+offerCondition must be an array of integers.
+Arrays must not be empty if provided.
+
+c.Nested Object Fields
+
+pageViewsFilter and currentPrice:
+
+min and max must be non-negative integers.
+If both min and max are provided: min <= max.
+
+repricerStrategy:
+
+If present, must be an object with non-empty string fields:
+
+`strategyType, strategyCollectionName, and strategyStatus.
+Can add enum-based validation for strategyStatus if needed (e.g. `ACTIVE`, `INACTIVE`, etc.).
+
+---
+
+3. sorts Validations
+
+sortField` must be one of:
+
+* "ITEM_NAME", "PAGE_VIEWS", "BUY_BOX_WIN_RATE", "ITEM_STATUS", "ITEM_ID".
+* sortOrder must be either "ASC" or "DESC".
+
+
+4. search Validations
+
+searchField` must be one of:
+"ITEM_NAME", "ITEM_ID", "SKU".
+searchValue` must be a non-empty string.
+Optionally sanitize searchValue (e.g., max length, escaping characters, etc.).
+
+
+5. Cross-Field Validation
+
+If `sortField = ITEM_NAME and searchField = ITEM_NAME, ensure both don’t conflict with performance or indexing strategies.
+Validate that sort/search fields are compatible with the backend schema and properly indexed (to avoid performance issues).
+
+
+6. Data Type Validation (Generic)
+
+Reject any unexpected types (e.g., strings in arrays of numbers).
+Check for unrecognized fields under each block 
+
+
+
+7. Length / Size Limits
+
+Set reasonable upper bounds:
+e.g., `offerCondition` array should not exceed 100 entries.searchValue` max 255 characters.
+Enforce pagination on result set if applicable.
+
+
+8. Null Handling
+
+If optional fields are omitted, treat them as null/ignored.
