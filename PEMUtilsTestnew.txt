@@ -1,0 +1,123 @@
+package com.truist.wholesale.openssl;
+
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.openssl.PEMKeyPair;
+import org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo;
+import org.junit.jupiter.api.Test;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.PrivateKey;
+import java.security.cert.X509Certificate;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+public class PEMUtilsTest {
+
+    private String getResourceContent(String path) {
+        try (InputStream resource = getResource(path);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(resource, StandardCharsets.UTF_8))) {
+            return reader.lines().collect(Collectors.joining(System.lineSeparator()));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+	
+	private InputStream getResource(String path) {
+        return this.getClass().getClassLoader().getResourceAsStream(path);
+    }
+	
+	@Test
+    void loadCertificateHandlesMultipleFiles() {
+        List<X509Certificate> certificateList = PEMUtils.loadCertificate("pem/self-signed.pem", "pem/self-signed-private.pem");
+        assertNotNull(certificateList);
+        assertTrue(certificateList.size() > 0);
+    }
+
+
+
+    @Test
+    void loadCertificateFromInputStream() {
+        InputStream is = getResource("pem/self-signed.pem");
+        List<X509Certificate> certificates = PEMUtils.loadCertificate(is);
+        assertNotNull(certificates);
+        assertFalse(certificates.isEmpty());
+    }
+
+    @Test
+    void loadCertificateFromPath() {
+        Path path = Paths.get("src/test/resources/pem/self-signed.pem");
+        List<X509Certificate> certificates = PEMUtils.loadCertificate(path);
+        assertNotNull(certificates);
+        assertFalse(certificates.isEmpty());
+    }
+
+    @Test
+    void parseCertificate()Test {
+        String certContent = getResourceContent("pem/self-signed.pem");
+        List<X509Certificate> certificates = PEMUtils.parseCertificate(certContent);
+        assertNotNull(certificates);
+        assertFalse(certificates.isEmpty());
+    }
+
+    @Test
+    void parsePrivateKeyWithoutPasswordTest() {
+        String keyContent = getResourceContent("pem/self-signed-private.pem");
+        PrivateKey privateKey = PEMUtils.parsePrivateKey(keyContent, null);
+        assertNotNull(privateKey);
+    }
+
+    @Test
+    void parsePrivateKeyWithPasswordTest() {
+        String keyContent = getResourceContent("pem/encrypted-private.pem");
+        char[] password = "password".toCharArray();
+        PrivateKey privateKey = PEMUtils.parsePrivateKey(keyContent, password);
+        assertNotNull(privateKey);
+    }
+
+	
+	@Test
+    void testParsePemContentValidCertificate() throws Exception {
+        String pem = getResourceContent("pem/self-signed.pem");
+        List<Object> result = invokeParsePemContent(pem, PEMSegmentType.CERTIFICATE::equals);
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+    }
+
+    @Test
+    void testParsePemContentValidPrivateKey() throws Exception {
+        String pem = getResourceContent("pem/self-signed-private.pem");
+        List<Object> result = invokeParsePemContent(pem, PEMSegmentType.PRIVATE_KEY::equals);
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+    }
+
+    @Test
+    void testParsePemContentEmptyString() throws Exception {
+        List<Object> result = invokeParsePemContent("", PEMSegmentType.CERTIFICATE::equals);
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testParsePemContentMalformedPem() {
+        String invalidPem = "INVALID DATA";
+        assertThrows(PEMParseException.class, () -> {
+            invokeParsePemContent(invalidPem, PEMSegmentType.CERTIFICATE::equals);
+        });
+    }
+
+
+	@SuppressWarnings("unchecked")
+    private List<Object> invokeParsePemContent(String content, Predicate<PEMSegmentType> predicate) throws Exception {
+        Method method = PEMUtils.class.getDeclaredMethod("parsePemContent", String.class, Predicate.class);
+        method.setAccessible(true);
+        return (List<Object>) method.invoke(null, content, predicate);
+    }
+
+}
