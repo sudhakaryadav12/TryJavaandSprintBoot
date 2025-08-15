@@ -1,45 +1,1193 @@
-Audit Log API Overview
 
-Introduction
-This document provides an overview of the Audit Log API and its interaction with different components. The API is designed to log and store audit-related data 
-such as sessions, user activities, activities, and users. The data flow involves an SQS queue, a handler service, and an API for persisting logs to a database.
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package com.oru.modelExtract;
 
-Architecture Overview
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import com.oru.dao.DBConnection;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+//import java.util.logging.Level;
+//import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-SQS Queue
-Queue Name:comob-aite-ue1-sqs-auditLogprimary.fifo`
-The queue acts as an intermediary message broker that receives audit log messages.
+/**
+ *
+ * @author TALATIS
+ * Version 2 as of Aug 2023 moved to server with Monsey changes Tag001
+ */
+public class ExtractFeederInformation {
 
-Message Flow
-Source:Mobile experience service generates a string message and sends it to the SQS queue.
-SQS Processing: A handler service reads messages from the queue.
-Handler Processing: The handler calls the Audit Log API to store the audit data.
-Audit Log API: Responsible for processing and storing audit-related information into the database.
+    //HashMap<Integer, Asset> assetMaster;
+    //public HashMap<Integer, Asset> getAssetMaster() {
+    //    return assetMaster;
+    //}    
+    private int addCableNumber = 2000000000;
+    private int tempPort = 1;
+    private final static Logger logger = LoggerFactory.getLogger(ExtractFeederInformation.class);
 
-#Audit Log Data Structure
-The API records the following types of data:
-Sessions
-User Activities
-Activities
-Users
+    public void extractAllFeeder() {
+        
+        
+        //logger.info("testing log4J");
+        HashMap<Integer, Asset> assetHmap = new HashMap<Integer, Asset>();
+        HashSet<Integer> openPoints = new HashSet<>();
+        HashMap<Integer, String> CircuitBreakerHmap = new HashMap<Integer, String>();
+        ArrayList<Integer> circuitsChanged = new ArrayList<>();
+        
+        
 
-Audit Report Database
-The audit report is stored in a database
+        String connectionTreeQuery = "SELECT conn.fida, conn.fidb,geom.featuretypeid,geom.attributes \n"
+                + "FROM ed.connection conn, ed.geom\n"
+                + " where conn.fida = geom.fid and geom.featuretypeid != 3500 \n"
+                + " and geom.featuretypeid != 3501";
+
+        String connectionCircuitBreakerQuery = "SELECT fid, circuit FROM asset_ed.ed_circuitbreaker order by fid";
+        // hard coding the fid of one circuit breaker for now 
+        try (Connection con = DBConnection.getConnectionToPG();
+                Statement connectionTreeStmt = con.createStatement();
+                Statement connectionCircBreakerStmt = con.createStatement();
+                Statement connectionOpenPointsCircStmt = con.createStatement(); /*Statement connectionAssetsInCircStmt = con.createStatement();*/) {
+                // new code added on 8/22 to process only the ciruits that have been changed in the last 48 hours 
+                Statement connectionCircChangedStmt = con.createStatement();
+                
+                
+            ResultSet rs = connectionTreeStmt.executeQuery(connectionTreeQuery);
+            Pattern pattern = Pattern.compile("\\bcircuit:([a-zA-Z0-9-/]+)");
+            while (rs.next()) {
+                int rsFid = rs.getInt("fida");
+                int rsFidConnectedTo = rs.getInt("fidb");
+                int featureTypeid = rs.getInt("featuretypeid");
+                String circuitAttributes = rs.getString("attributes");
+
+                //Pattern pattern = Pattern.compile( "(?<=\\bcircuit\\S)(\\S+[^::])" );
+                Matcher matcher = pattern.matcher(circuitAttributes);
+
+                //logger.info( matcher.find() );  // Prints true.
+                //logger.info( "fid =" + rsFid );  // Prints true.
+                String circuitId = "";
+                if (matcher.find()) {
+                    circuitId = matcher.group().replace("circuit:", "");
+                    //logger.info(circuitId);
+                }
+                /*else
+                 {
+                 //logger.info("did not find the circuit");
+                 }*/
+                // this code was added on 7/6 because while 1911 transmission data was getting extracted
+                if (featureTypeid != 3500 && featureTypeid != 3501) {
+                    Asset asset = assetHmap.get(rsFid);
+                    if (asset == null) {
+                        Asset tempAsset = new Asset();
+                        tempAsset.setAssetId(rsFid);
+                        tempAsset.setAssetConnectedTo(rsFidConnectedTo);
+                        tempAsset.setFeaturetypeid(featureTypeid);
+                        tempAsset.setCircuit(circuitId);
+                        assetHmap.put(rsFid, tempAsset);
+                    } else {
+                        asset.setAssetConnectedTo(rsFidConnectedTo);
+                    }
+                }
+            }
+            rs.close();
+
+            rs = connectionCircBreakerStmt.executeQuery(connectionCircuitBreakerQuery);
+
+            while (rs.next()) {
+                int rsFid = rs.getInt("fid");
+                String rsCircuit = rs.getString("circuit");
+
+                CircuitBreakerHmap.put(rsFid, rsCircuit);
+            }
+            rs.close();
+
+            ////
+            /*String openPointsOnACircuit = "SELECT fid\n"
+                    + "  FROM ed.geom where attributes like '%::dstat:Open%' \n"
+                    + "  union\n"
+                    + "  SELECT fid\n"
+                    + "  FROM ed.geom where attributes like 'dstat:Open%' ";
+            
+            */
+            
+            // code changed on 10/23/2017
+            
+            String openPointsOnACircuit = " SELECT fid \n" +
+            " FROM ed.geom where attributes like '%::designdstat:Open%' \n" +
+            " union\n" +
+            " SELECT fid \n" +
+            " FROM ed.geom where attributes like 'designdstat:Open%'";
+            
+            
+            rs = connectionOpenPointsCircStmt.executeQuery(openPointsOnACircuit);
+
+            while (rs.next()) {
+                int rsFid = rs.getInt("fid");
+                openPoints.add(rsFid);
+            }
+            rs.close();
+
+            SetPortForOpenPoint(assetHmap, openPoints);
+
+            HashSet<Integer> circuitBreakersProcessed = new HashSet<>();;
+
+             for (Integer key : CircuitBreakerHmap.keySet()) {
+                // 11/30/22 gandhamj added the following fids to exclude the 2 disconnects at the start of 44-5A and B
+                       if (key != 9190955 && key != 9190952 && key != 7533405 && key != 9955022
+                         //919055 and 9190952 will be Rio
+                         //9955022 will be (Cir: 54-2-13 Sub: 54) Breaker 54213-DG-69//61)
+            			// 1/17/2023 add fids for new breakers 44-5A and B to match Rio 3-1N&S configuration
+                		&& key != 113019908 && key != 113019907
+                		// 3/6/2023 add fids for new breakers 44-3A and B to match Rio 3-1N&S config 
+                		&& key != 113019931 && key != 113019930
+                		// 04/29/2024  add fids for new nested breaker 128M-1-13 and 128M-2-13 to match Monsey
+                		  && key != 127496269 && key != 127496267 
+                		// 04/28/2025  add fids for new nested breaker 129M-1-13 and 129M-2-13 to match Monsey
+                           && key != 136020496 && key != 136020498 
+                        // 07/16/2025  add fids for new nested breaker 9-T1-13 and 9-T5-13 to match Monsey
+                           && key != 136251159 && key != 136251161 
+            			) {
+            		  SetConnectivityPortVersion2(key, assetHmap, CircuitBreakerHmap, circuitBreakersProcessed, openPoints);
+            	}
+            }
+          //end of new code change Tag001 added by gandhamj 01/17/2023
+
+            
+            
+            // new code 8/22/ to process only the circuits that have changed in the last 48 hours
+            
+            String circuitsChangedIn48hrs = "SELECT fid, circuit\n" +
+            "  FROM nmsmodelextract.circuitschanged_fornmsfileextract;";
+            
+            rs = connectionCircChangedStmt.executeQuery(circuitsChangedIn48hrs);
+            while (rs.next()) {
+                int rsFid = rs.getInt("fid");
+                circuitsChanged.add(rsFid);
+            }
+            rs.close();            
+
+            for (Integer key : circuitsChanged) {
+            // 11/30/22 gandhamj added the following fids to exclude the 2 disconnects at the start of 44-5A and B
+            	if (key != 9190955 && key != 9190952 && key != 7533405 && key != 9955022
+            			//919055 and 9190952 will be Rio
+                        //9955022 will be (Cir: 54-2-13 Sub: 54) Breaker 54213-DG-69//61)
+                    	// 1/17/2023 add fids for new breakers 44-5A and B to match 3-1N&S
+                    		&& key != 113019908 && key != 113019907
+                    		// 3/6/2023 add fids for new breakers 44-3A and B to match Rio 3-1N&S config 
+                    		&& key != 113019931 && key != 113019930
+                    		//04/29/2024  add fids for new nested breaker 128M-1-13 and 128M-2-13 to match Monsey
+                    		  && key != 127496269 && key != 127496267
+                    		// 04/28/2025  add fids for new nested breaker 129M-1-13 and 129M-2-13 to match Monsey 
+                              && key != 136020496 && key != 136020498
+                           // 07/16/2025  add fids for new nested breaker 9-T1-13 and 9-T5-13 to match Monsey
+                              && key != 136251159 && key != 136251161 
+                    		)
+            		//logger.info("Circuit for state school");
+            	{
+            		
+                    	//end of new code change Tag001 added by gandhamj 01/17/2023
+
+                    //if(tempcount >= 0 && tempcount <= 10)
+                    //{
+                    extractCircuitFile(key, assetHmap, openPoints, CircuitBreakerHmap);
+                    //logger.info(tempcount);
+                    //}
+                    //tempcount++;
+                }
+                //if(tempcount >= 10)
+                //{
+                //    break;
+                //}
+            }
+        
+            
+            
+        /*    
+            // new code 7/14/
+            //int tempcount = 0;
+            
+            for (Integer key : CircuitBreakerHmap.keySet()) {
+                if (key != 9190955 && key != 9190952 && key != 7533405 && key != 9955022) {
+                    //if(tempcount >= 0 && tempcount <= 10)
+                    //{
+                    extractCircuitFile(key, assetHmap, openPoints, CircuitBreakerHmap);
+                    //logger.info(tempcount);
+                    //}
+                    //tempcount++;
+                }
+                //if(tempcount >= 10)
+                //{
+                //    break;
+                //}
+            }
+        */   
+            
+        } catch (Exception e) {
+            logger.error(e.getMessage());            
+        }
+//        }
+
+        //####logger.info(LocalDateTime.now());
+        /*
+        try {
+            while (true) {
+                InputStreamReader inputStreamReader = new InputStreamReader(System.in);
+                BufferedReader reader = new BufferedReader(inputStreamReader);
+                logger.info("Type fid for which you want downstream elements , or type X to exist:");
+                String value = reader.readLine();
+                if (value.equalsIgnoreCase("X")) {
+                    break;
+                }
+
+                Integer consoleValue = Integer.valueOf(value);
+                if (consoleValue != 9190955 && consoleValue != 9190952 && consoleValue != 7533405 && consoleValue != 9955022) {
+                    extractCircuitFile(consoleValue, assetHmap, openPoints, CircuitBreakerHmap);
+                } else {
+                    logger.info("this breaker is not to be processed");
+                }
+            }
+        } catch (Exception e) {
+            logger.error(e.getMessage());            
+        }
+        */
+        /*
+         ResultSet rs = stmt.executeQuery(assetQuery);
+         while (rs.next()) {
+         int rsFId = rs.getInt("fid");
+         String rsCircuitId = rs.getString("circuit");
+         logger.info(rsFId);
+         logger.info(rsCircuitId);
+         psNetworkTree.setString(1, rsCircuitId);
+         psNetworkTree.setInt(2, rsFId);
+         psNetworkTree.setInt(3, rsFId);
+                
+         ResultSet rsNetworkTree = psNetworkTree.executeQuery();
+         logger.info("Printing downstream Network tree for 9450833");
+         while (rsNetworkTree.next()) {                
+         int networkTreeFid = rsNetworkTree.getInt("fid");
+         logger.info(networkTreeFid);
+         }              
+                
+         }
+         */
+
+    }
+
+    // this is new code to extract the feeders 
+    private void extractCircuitFile(int fid, HashMap<Integer, Asset> circuitAssets, HashSet<Integer> openPoints, HashMap<Integer, String> CircuitBreakerHmap) {
+
+        try {
+
+            ArrayList<Integer> workQueue = new ArrayList<>();
+
+            HashSet<Integer> nrgAssetSet = new HashSet<>();
+
+            Asset startingAsset = circuitAssets.get(fid);
+
+            logger.info("Circuit breaker id being worked on = " + fid);
+
+            if (startingAsset != null) {
+                //nmsFile.write(header);
+
+                workQueue.add(fid);
+
+                //if (startingAsset.getGeomType().equals("POINT")) {
+                if (startingAsset.getFeaturetypeid() != 105) {
+                    while (!workQueue.isEmpty()) {
+
+                        int id = workQueue.get(0);
+
+                        /*if (id == 1957828) {
+                         logger.info("break");
+                         }*/
+                        nrgAssetSet.add(id);
+                        //logger.info("Asset list = " + id);
+                        Asset asset = circuitAssets.get(id);
+
+                        //logger.info(id);
+                        if (asset != null && openPoints.contains(id) == false) {
+                            //logger.info("Downstream circuits = " + asset.getCircuit());
+                            if (asset.getCircuit().equalsIgnoreCase(startingAsset.getCircuit()) == false) {
+                                if (asset.getFeaturetypeid() != 101 && asset.getFeaturetypeid() != 200000 && asset.getFeaturetypeid() != 300000) {
+                                    if (asset.getCircuit().equalsIgnoreCase("00-00-00")) {
+                                        //nrgAssetSet.remove(id);
+                                    } else if (asset.getCircuit().equalsIgnoreCase("L100-00/00-34")) {
+                                        asset.setCircuit("L6-00/00-34");
+                                        //nrgAssetSet.remove(id);
+                                    } else if (asset.getCircuit().equalsIgnoreCase("L101-00/00-34")) {
+                                        asset.setCircuit("L4-00/00-34");
+                                    } else if (asset.getCircuit().equalsIgnoreCase("3-1S-34")) {
+                                        // ignore
+                                    } else if (asset.getCircuit().equalsIgnoreCase("3-1N-34")) {
+                                        // ignore
+                                    	
+                                    /*added code by gandhamj here for temp nested substation test as the ignored circuits */
+
+                                    } else if (asset.getCircuit().equalsIgnoreCase("44-5A-13")) {
+
+                                    } else if (asset.getCircuit().equalsIgnoreCase("44-5B-13")) {
+                                    	
+                                    } else if (asset.getCircuit().equalsIgnoreCase("44-3A-13")) {
+
+                                    } else if (asset.getCircuit().equalsIgnoreCase("44-3B-13")) {
+                                        
+                                    //*end code change Tag001 by gandhamj for temp nested substation test as the ignored circuits *//	
+                                    //*added code by gandhamj here for temp nested substation test as the ignored circuits *//
+
+                                    } else if (asset.getCircuit().equalsIgnoreCase("128M-1-13")) {
+                                    	
+                                    } else if (asset.getCircuit().equalsIgnoreCase("128M-2-13")) {
+                                    
+                                    } else if (asset.getCircuit().equalsIgnoreCase("129M-1-13")) {
+                                   	
+                                   	} else if (asset.getCircuit().equalsIgnoreCase("129M-2-13")) {
+                                   		
+                                   	} else if (asset.getCircuit().equalsIgnoreCase("9-T1-13")) {
+                                       	
+                                   	} else if (asset.getCircuit().equalsIgnoreCase("9-T5-13")) {
+                                   	
+                                    //*end code change Tag002 by gandhamj for temp nested substation test as the ignored circuits *//                                 	                                    
+                                     
+                                    }                                  		                                   
+                                    else {
+                                        
+                                    	logger.info("Asset id with the problem -" + asset.getAssetId());
+                                        logger.info("There is a problem here , we are going into a different circuit");
+                                        logger.info("Original circuit = " + startingAsset.getCircuit());
+                                        logger.info("new circuit = " + asset.getCircuit());
+                                      
+                                    }
+                                }
+
+                            }
+
+                            //logger.info(asset.getCircuit());
+                            HashSet<Integer> connectedAssets = asset.getAssetConnectedTo();
+
+                            for (Integer v : connectedAssets) {
+                                if (workQueue.contains(v) == false && nrgAssetSet.contains(v) == false) {
+                                    // 7/18 - may be we need to check for open points here
+                                    // if its an open point add it to the asset - nrgAssetSet but dont add it to the work queue
+
+                                    workQueue.add(v);
+
+                                    /*if (openPoints.contains(v) == false) {
+                                     workQueue.add(v);
+                                     } else {
+                                        
+                                     Asset tempasset = circuitAssets.get(v);
+                                     if (tempasset != null) {
+                                     if (tempasset.getCircuit().equalsIgnoreCase(startingAsset.getCircuit()) == false) {
+                                     if (tempasset.getFeaturetypeid() != 101 && tempasset.getFeaturetypeid() != 200000 && tempasset.getFeaturetypeid() != 300000) {
+                                     if (tempasset.getCircuit().equalsIgnoreCase("00-00-00")) {
+                                     //nrgAssetSet.remove(id);
+                                     } else if (tempasset.getCircuit().equalsIgnoreCase("L100-00/00-34")) {
+                                     tempasset.setCircuit("L6-00/00-34");
+                                     //nrgAssetSet.remove(id);
+                                     } else if (tempasset.getCircuit().equalsIgnoreCase("L101-00/00-34")) {
+                                     tempasset.setCircuit("L4-00/00-34");
+                                     } 
+                                                    
+                                     //else {
+                                     //    logger.info("Asset id with the problem -" + tempasset.getAssetId());
+                                     //    logger.info("There is a problem here , we are going into a different circuit");
+                                     //}
+                                                    
+                                     }
+                                     }
+
+                                     nrgAssetSet.add(v);
+
+                                     }
+
+                                     }*/
+                                    //logger.info("work queue = " + v);
+                                }
+                            }
+
+                            /*connectedAssets.forEach((v) -> {
+                             if (workQueue.contains(v) == false && nrgAssetSet.contains(v) == false) {
+                             workQueue.add(v);
+                             //logger.info("work queue = " + v);
+                             }
+                             });*/
+                            workQueue.remove(0);
+
+                        } else {
+                            if (workQueue.size() > 0) {
+                                workQueue.remove(0);
+                            }
+                        }
+
+                    }
+
+                }
+
+                // new code added on 8/30/2016
+                String assetToQuery = nrgAssetSet.toString();
+                assetToQuery = assetToQuery.replaceAll("]", "");
+                assetToQuery = assetToQuery.replace("[", "");
+                String custDotCircuit = startingAsset.getCircuit();
+                startingAsset = null;
+                // end of new code 
+
+                //// here we start the other thread to load additional data 
+                CapacitorAttributesThread capacitorAttributesThread = new CapacitorAttributesThread(circuitAssets, assetToQuery);
+                capacitorAttributesThread.start();
+
+                CircuitBreakerAttributesThread circuitBreakerAttributesThread = new CircuitBreakerAttributesThread(circuitAssets, assetToQuery);
+                circuitBreakerAttributesThread.start();
+
+                CompoundCurveThread compoundCurveThread = new CompoundCurveThread(circuitAssets, assetToQuery);
+                compoundCurveThread.start();
+
+                CustDotAttributesThread custThread = new CustDotAttributesThread(circuitAssets, assetToQuery,custDotCircuit);
+                custThread.start();
+
+                DistGenAttributesThread distGenAttributesThread = new DistGenAttributesThread(circuitAssets, assetToQuery);
+                distGenAttributesThread.start();
+                
+                AMIAttributesThread amiAttributesThread = new AMIAttributesThread(circuitAssets, assetToQuery);
+                amiAttributesThread.start();                
+
+                OHDAttributesThread ohdThread = new OHDAttributesThread(circuitAssets, assetToQuery);
+                ohdThread.start();
+
+                PrimaryCableAttributesThread primaryCableAttributesThread = new PrimaryCableAttributesThread(circuitAssets, assetToQuery);
+                primaryCableAttributesThread.start();
+
+                PrimaryMeterAttributesThread primaryMeterAttributesThread = new PrimaryMeterAttributesThread(circuitAssets, assetToQuery);
+                primaryMeterAttributesThread.start();
+
+                RegulatorAttributesThread regulatorAttributesThread = new RegulatorAttributesThread(circuitAssets, assetToQuery);
+                regulatorAttributesThread.start();
+
+                StepTransformerAttributesThread stepTransformerThread = new StepTransformerAttributesThread(circuitAssets, assetToQuery);
+                stepTransformerThread.start();
+
+                TransSupplySwitchAttributesThread transSupplySwitchAttributesThread = new TransSupplySwitchAttributesThread(circuitAssets, assetToQuery);
+                transSupplySwitchAttributesThread.start();
+
+                TransformerAttributesThread transformerThread = new TransformerAttributesThread(circuitAssets, assetToQuery);
+                transformerThread.start();
+
+                UGDAttributesThread uGDAttributesThread = new UGDAttributesThread(circuitAssets, assetToQuery);
+                uGDAttributesThread.start();
+
+                try {
+                    capacitorAttributesThread.join();
+                    circuitBreakerAttributesThread.join();
+                    compoundCurveThread.join();
+                    custThread.join();
+                    distGenAttributesThread.join();
+                    amiAttributesThread.join();
+                    ohdThread.join();
+                    primaryCableAttributesThread.join();
+                    primaryMeterAttributesThread.join();
+                    regulatorAttributesThread.join();
+                    stepTransformerThread.join();
+                    transSupplySwitchAttributesThread.join();
+                    transformerThread.join();
+                    uGDAttributesThread.join();
+
+                } catch (InterruptedException e) {
+                    logger.error(e.getMessage());            
+                }
+
+                AnnotationAttributesThread annotationAttributesThread = new AnnotationAttributesThread(circuitAssets, assetToQuery);
+                annotationAttributesThread.start();
+                try {
+                    annotationAttributesThread.join();
+                } catch (InterruptedException e) {
+                    logger.error(e.getMessage());            
+                }
+
+                GetAttributesForCables(assetToQuery, circuitAssets);
+
+                //logger.info("processing circuit breaker =" + fid);
+                StringBuilder sb = new StringBuilder();
+
+                /////FileWriter nmsFile = new FileWriter();
+                //nmsFile.create(startingAsset.getCircuit().replaceAll("/", "-") + ".mp");
+                /////nmsFile.create(circuitFileName + ".mp");
+                DateFormat df = new SimpleDateFormat("dd/MM/yy HH:mm:ss");
+                Date dateobj = new Date();
+                startingAsset = circuitAssets.get(fid);
+                String circuitFileName = startingAsset.getCircuit();
+
+                logger.info("Circuit name = " + circuitFileName);
+
+                if (circuitFileName != null) {
+                    circuitFileName = circuitFileName.replaceAll("/", "-");
+                    //circuitFileName = circuitFileName + "-" + startingAsset.getAssetId();
+                }
+
+                String header = "ADD NONSPATIAL " + startingAsset.getCircuit().replaceAll("/", "//") + " {\n"
+                        + "NAME = " + startingAsset.getCircuit() + ";\n"
+                        + "COORD_SYSTEM = NAD27 New York East;\n"
+                        + "EXTRACT_DATE_TIME = " + df.format(dateobj) + ";\n"
+                        + "EXTRACTOR_VERSION = Sandip Talati's Version :);\n"
+                        + "SCALE_FACTOR = 1.0;\n"
+                        + "DIAGRAM[NONSPATIAL] = {\n"
+                        + "GEOMETRY = {\n"
+                        + "(601273.9945, 398460.63500228),(601844.41523628,402916.018007706);\n"
+                        + "};\n"
+                        + "};\n"
+                        + "};";
+                sb.append(header);
+
+                for (Integer v : nrgAssetSet) {
+                //nrgAssetSet.forEach((v) -> {
+                    /*if(v == 3074635)
+                     {
+                     logger.info("debug");
+                     }*/
+                    //logger.info("id being printed=" + v);
+                    Asset extractionAsset = circuitAssets.get(v);
+
+                    if (extractionAsset != null) { // && extractionAsset.getCircuit().equalsIgnoreCase("00-00-00") == false) {  // commented on 922
+                        if (extractionAsset.getFeaturetypeid() == 200000) {
+                            try {
+                                Asset dependentAssetA = circuitAssets.get(extractionAsset.getDependentAssetAForAutoGen());
+                                Asset dependentAssetB = circuitAssets.get(extractionAsset.getDependentAssetBForAutoGen());
+                                String geom = dependentAssetA.nmsGeomAttributes.get("geometry") + "," + dependentAssetB.nmsGeomAttributes.get("geometry");
+                                //String geom = "";
+                                extractionAsset.setNmsGeomAttributes("geometry", geom);
+                                extractionAsset.setAssetType("ED_Primary_Temp");
+                                extractionAsset.setNmsAttributes("primarytype", "UG");
+                                extractionAsset.setNmsGeomAttributes("rotation", "0");
+                                extractionAsset.setNmsGeomAttributes("geomType", "LINESTRING");
+
+                                if (dependentAssetA.getFeaturetypeid() == 10076) {
+                                    extractionAsset.setNmsAttributes("phase", dependentAssetA.getNmsAttributes("phase"));
+                                    extractionAsset.setNmsAttributes("circuit", dependentAssetA.getNmsAttributes("circuit"));
+                                    String tempFid = String.valueOf(dependentAssetA.getAssetId()) + String.valueOf(dependentAssetB.getAssetId());
+                                    extractionAsset.setTempAssetId(tempFid);
+
+                                } else if (dependentAssetB.getFeaturetypeid() == 10076) {
+                                    extractionAsset.setNmsAttributes("phase", dependentAssetB.getNmsAttributes("phase"));
+                                    extractionAsset.setNmsAttributes("circuit", dependentAssetB.getNmsAttributes("circuit"));
+
+                                    String tempFid = String.valueOf(dependentAssetB.getAssetId()) + String.valueOf(dependentAssetA.getAssetId());
+                                    extractionAsset.setTempAssetId(tempFid);
+
+                                }
+
+                                sb.append(extractionAsset.writeLineAsset());
+                                /////nmsFile.write(extractionAsset.writeLineAsset());
+                            } catch (Exception ex) {
+                                logger.error("error", ex);
+                            }
+                        } else if (extractionAsset.getFeaturetypeid() == 300000) {
+                            try {
+                                Asset dependentAssetA = circuitAssets.get(extractionAsset.getDependentAssetAForAutoGen());
+                                Asset dependentAssetB = circuitAssets.get(extractionAsset.getDependentAssetBForAutoGen());
+                                if (dependentAssetA.nmsGeomAttributes.get("geometry") == null || dependentAssetB.nmsGeomAttributes.get("geometry") == null) {
+                                    //logger.info("debug");
+                                    //logger.info(dependentAssetA.getAssetId());
+                                    //logger.info(dependentAssetB.getAssetId());
+                                    continue;
+                                }
+
+                                String geom = dependentAssetA.nmsGeomAttributes.get("geometry") + "," + dependentAssetB.nmsGeomAttributes.get("geometry");
+                                //String geom = "";
+                                extractionAsset.setNmsGeomAttributes("geometry", geom);
+                                extractionAsset.setAssetType("ED_Secondary");
+                                //extractionAsset.setNmsAttributes("primarytype", "UG");
+                                extractionAsset.setNmsGeomAttributes("rotation", "0");
+                                extractionAsset.setNmsGeomAttributes("geomType", "LINESTRING");
+
+                                if (dependentAssetA.getFeaturetypeid() == 108 || dependentAssetA.getFeaturetypeid() == 10025) {
+                                    String tempFid = String.valueOf(dependentAssetA.getAssetId()) + String.valueOf(dependentAssetB.getAssetId());
+                                    extractionAsset.setTempAssetId(tempFid);
+
+                                    extractionAsset.setNmsAttributes("circuit", dependentAssetA.getNmsAttributes("circuit"));
+                                    if (dependentAssetA.getNmsAttributes("phase") != null) {
+                                        extractionAsset.setNmsAttributes("phase", dependentAssetA.getNmsAttributes("phase"));
+                                    }
+                                    if (dependentAssetA.getNmsAttributes("phase1") != null) {
+                                        extractionAsset.setNmsAttributes("phase1", dependentAssetA.getNmsAttributes("phase1"));
+                                    }
+                                    if (dependentAssetA.getNmsAttributes("phase2") != null) {
+                                        extractionAsset.setNmsAttributes("phase2", dependentAssetA.getNmsAttributes("phase2"));
+                                    }
+                                    if (dependentAssetA.getNmsAttributes("phase3") != null) {
+                                        extractionAsset.setNmsAttributes("phase3", dependentAssetA.getNmsAttributes("phase3"));
+                                    }
+
+                                    if (dependentAssetA.getFeaturetypeid() == 10025) {
+                                        if (dependentAssetA.getNmsAttributes("phase") != null) {
+                                            dependentAssetB.setNmsAttributes("phase", dependentAssetA.getNmsAttributes("phase"));
+                                        }
+
+                                    }
+
+                                } else if (dependentAssetB.getFeaturetypeid() == 108 || dependentAssetB.getFeaturetypeid() == 10025) {
+
+                                    String tempFid = String.valueOf(dependentAssetB.getAssetId()) + String.valueOf(dependentAssetA.getAssetId());
+                                    extractionAsset.setTempAssetId(tempFid);
+
+                                    extractionAsset.setNmsAttributes("circuit", dependentAssetB.getNmsAttributes("circuit"));
+                                    if (dependentAssetB.getNmsAttributes("phase") != null) {
+                                        extractionAsset.setNmsAttributes("phase", dependentAssetB.getNmsAttributes("phase"));
+                                    }
+                                    if (dependentAssetB.getNmsAttributes("phase1") != null) {
+                                        extractionAsset.setNmsAttributes("phase1", dependentAssetB.getNmsAttributes("phase1"));
+                                    }
+                                    if (dependentAssetB.getNmsAttributes("phase2") != null) {
+                                        extractionAsset.setNmsAttributes("phase2", dependentAssetB.getNmsAttributes("phase2"));
+                                    }
+                                    if (dependentAssetB.getNmsAttributes("phase3") != null) {
+                                        extractionAsset.setNmsAttributes("phase3", dependentAssetB.getNmsAttributes("phase3"));
+                                    }
+
+                                    if (dependentAssetB.getFeaturetypeid() == 10025) {
+                                        if (dependentAssetB.getNmsAttributes("phase") != null) {
+                                            dependentAssetA.setNmsAttributes("phase", dependentAssetB.getNmsAttributes("phase"));
+                                        }
+
+                                    }
+
+                                }
+
+                                sb.append(extractionAsset.writeLineAsset());
+                                /////////nmsFile.write(extractionAsset.writeLineAsset());
+                            } catch (Exception ex) {
+                                logger.error("error", ex);
+                            }
+                        } else if (extractionAsset.getFeaturetypeid() == 105) {
+                            try {
+                                sb.append(extractionAsset.writeLineAsset());
+                                /////////nmsFile.write(extractionAsset.writeLineAsset());
+                            } catch (Exception ex) {
+                                logger.error("error", ex);
+                            }
+                        } else {
+                            try {
+                                if (openPoints.contains(extractionAsset.getAssetId()) == true) {
+                                    extractionAsset.getOpenPointCircuitFids().forEach((tv) -> {
+                                        if (CircuitBreakerHmap.get(tv) != null && CircuitBreakerHmap.get(tv).equalsIgnoreCase(extractionAsset.getCircuit()) == false) {
+                                            extractionAsset.setNmsAttributes("circuit1", CircuitBreakerHmap.get(tv));
+                                        }
+                                    });
+                                }
+                                // new code added to exclude customer locations that dont have a matching address
+                                if (extractionAsset.nmsGeomAttributes.get("geomType") != null) {
+                                    String pointout = extractionAsset.writePointAsset();
+                                    //logger.info(pointout);
+                                    sb.append(extractionAsset.writePointAsset());
+                                } else {
+                                    //logger.info("lets debug");
+                                }
+                                /////////nmsFile.write(extractionAsset.writePointAsset());
+                            } catch (Exception ex) {
+                                logger.error("error", ex);
+                            }
+                        }
+                    }
+
+                    //});
+                }
+
+                //logger.info(sb.toString());
+                FileWriter nmsFile = new FileWriter();
+                //nmsFile.create("F:\\NMSFileExtracts\\" + circuitFileName + ".mp");
+                //nmsFile.create("/home/oru/NMSFileExtract/Files/" + circuitFileName + ".mp");
+                nmsFile.create("Files/" + circuitFileName + ".mp");
+                nmsFile.write(sb.toString());
+                nmsFile.close();
+                nmsFile = null;
+
+                for (Integer v : nrgAssetSet) {
+                    //nrgAssetSet.forEach((v) -> {
+                    //logger.info("id being printed=" + v);
+                    Asset extractionAsset = circuitAssets.get(v);
+                    if (extractionAsset != null) {
+                        extractionAsset.nmsAttributes.clear();
+                        extractionAsset.nmsGeomAttributes.clear();
+                    }
+                }
+
+                nrgAssetSet = null;
+                sb = null;
+                workQueue = null;
+
+            }
+            // insert here 
+        } catch (Exception e) {
+            logger.info("got an error dumbo" + e.getMessage());
+
+        }
+
+    }
+
+    /// version 2
+    private void SetConnectivityPortVersion2(int fid, HashMap<Integer, Asset> circuitAssets, HashMap<Integer, String> circuitBreakerHmap, HashSet<Integer> ciruitBreakerProcessed, HashSet<Integer> openPoints) {
+
+        try {
+
+            ArrayList<Integer> workQueue = new ArrayList<>();
+            HashSet<Integer> visitedQueue = new HashSet<>();
+
+            int circuitBreakerFid = fid;
+
+            Asset startingAsset = circuitAssets.get(fid);
+            if (startingAsset != null) {
+                workQueue.add(fid);
+
+                if (startingAsset.getFeaturetypeid() == 10050) {
+                    circuitBreakerFid = fid;
+                    while (!workQueue.isEmpty()) {
+
+                        int id = workQueue.get(0);
+
+                        Asset asset = circuitAssets.get(id);
+                        if (circuitBreakerHmap.containsKey(id)) {
+                            //logger.info("####################Circuit breaker id=" + id + " is being processed########################################");
+                            ciruitBreakerProcessed.add(id);
+                        }
 
 
-Audit Log API
-Endpoint:`/auditlogapi`
-Method:`POST`
-Functionality: Records audit log data into the database.
+                        /*if (id == 7325413 || id == 7325378 || id == 8297060 || id == 7325411) {
+                         logger.info("break");
+                         }*/
+                        if (asset != null && (visitedQueue.contains(id) == false)) {
 
-This API implementation ensures a structured approach to audit logging, leveraging SQS for message processing and a dedicated Audit Log API for storing data. 
-The setup provides reliable and efficient audit tracking for mobile experiences.
+                            if (asset.getFeaturetypeid() != 105) {
+                                if (asset.getConnectionPortA() == 0) {
+                                    asset.setConnectionPortA(tempPort);
+                                    tempPort++;
+                                }
+                                //logger.info("Point assset fid = " + asset.getAssetId() + " , connection port =" + asset.getConnectionPortA());
 
+                                HashSet<Integer> connectedAssets = asset.getAssetConnectedTo();
+                                Iterator<Integer> iterator = connectedAssets.iterator();
+                                HashSet<Integer> addConnList = new HashSet<>();
+                                HashSet<Integer> remConnList = new HashSet<>();
+                                while (iterator.hasNext()) {
+                                    Integer v = iterator.next();
+                                    /*if (v == 7325413 || v == 7325378 || v == 8297060 || v == 7325411) {
+                                     logger.info("break");
+                                     }*/
 
-========================================================================================================
+                                    if (!visitedQueue.contains(v)) {
+                                        Asset tempAsset = circuitAssets.get(v);
 
-Question : so through sqs are we using any other url before calling the prd url, or are we directly calling th eprd url
-. please give some details on this
+                                        if (tempAsset != null) {
 
-Answer : SQS handler reads messages from the queue and directly calls the Audit Log API (/auditlogapi) to record data into the database.
+                                            if (tempAsset.getFeaturetypeid() != 105 && tempAsset.getFeaturetypeid() != 200000 && tempAsset.getFeaturetypeid() != 300000) {
+                                                /*if (tempAsset.getAssetId() == 9079434 || tempAsset.getAssetId() == 9079437) {
+                                                 logger.info("break");
+                                                 }*/
+
+                                                Asset newLinear = new Asset();
+                                                newLinear.setAssetId(addCableNumber);
+                                                addCableNumber--;
+                                                newLinear.setConnectionPortA(asset.getConnectionPortA());
+                                                if (tempAsset.getConnectionPortA() == 0) {
+                                                    newLinear.setConnectionPortB(tempPort);
+                                                    tempPort++;
+                                                    tempAsset.setConnectionPortA(newLinear.getConnectionPortB());
+                                                } else {
+                                                    newLinear.setConnectionPortB(tempAsset.getConnectionPortA());
+                                                }
+
+                                                newLinear.setAssetConnectedTo(asset.getAssetId());
+                                                newLinear.setAssetConnectedTo(tempAsset.getAssetId());
+                                                newLinear.setAutoGeneratedCable(true);
+                                                circuitAssets.put(newLinear.getAssetId(), newLinear);
+                                                newLinear.setDependentAssetAForAutoGen(asset.getAssetId());
+                                                newLinear.setDependentAssetBForAutoGen(tempAsset.getAssetId());
+
+                                                if (asset.getFeaturetypeid() == 10076 || tempAsset.getFeaturetypeid() == 10076) {
+                                                    newLinear.setFeaturetypeid(200000);
+                                                } else {
+                                                    newLinear.setFeaturetypeid(300000);
+                                                    if (asset.getFeaturetypeid() == 108 || asset.getFeaturetypeid() == 10025) {
+                                                        newLinear.setNmsAttributes("supply_fid", String.valueOf(asset.getAssetId()));
+                                                        // new code added on 8/25/
+                                                        //tempAsset.setNmsAttributes("circuit", asset.getCircuit());
+                                                        //if (asset.getNmsAttributes("phase") != null) {
+                                                        //    tempAsset.setNmsAttributes("phase", asset.getNmsAttributes("phase"));
+                                                        //}                                                        
+                                                        // not sure why this code was added here , this logic is there in the file extraction part 
+
+                                                    } else {
+                                                        newLinear.setNmsAttributes("supply_fid", String.valueOf(tempAsset.getAssetId()));
+                                                    }
+                                                }
+
+                                                addConnList.add(newLinear.getAssetId());
+                                                remConnList.add(tempAsset.getAssetId());
+
+                                                tempAsset.setAssetConnectedTo(newLinear.getAssetId());
+
+                                                tempAsset.RemoveAssetConnectedTo(asset.getAssetId());
+                                                visitedQueue.add(newLinear.getAssetId());
+
+                                            } else if (tempAsset.getFeaturetypeid() == 105) {
+                                                if (tempAsset.getConnectionPortA() == 0 || (tempAsset.getConnectionPortA() == asset.getConnectionPortA())) {
+                                                    tempAsset.setConnectionPortA(asset.getConnectionPortA());
+                                                } else if (tempAsset.getConnectionPortB() == 0) {
+                                                    // this was added on 7/1/2016
+                                                    tempAsset.setConnectionPortB(asset.getConnectionPortA());
+                                                    //logger.info("&&&&&&&&&&&&&&&&&&&&&&&&This should never ever happen , Point asset is connected to line - fid=" + tempAsset.getAssetId() + " whose portA is already filled in");
+                                                } else {
+                                                    //logger.info("%%%%%%%%%%%%%%%%%%This should never ever happen , Point asset is connected to line - fid=" + tempAsset.getAssetId() + " whose portA and portB is already filled in");
+                                                }
+                                            }
+                                            if (workQueue.contains(tempAsset.getAssetId()) == false && visitedQueue.contains(tempAsset.getAssetId()) == false && tempAsset.getFeaturetypeid() != 300000 && tempAsset.getFeaturetypeid() != 200000 && tempAsset.getFeaturetypeid() != 101 && tempAsset.getFeaturetypeid() != 10162) {
+
+                                                if (openPoints.contains(tempAsset.getAssetId()) == false) {
+                                                    workQueue.add(tempAsset.getAssetId());
+                                                } else {
+                                                    tempAsset.setOpenPointCircuitFids(circuitBreakerFid);
+                                                }
+
+                                            }
+                                        }
+                                    }
+                                }
+                                if (addConnList.size() > 0) {
+                                    asset.getAssetConnectedTo().addAll(addConnList);
+                                }
+                                if (remConnList.size() > 0) {
+                                    asset.getAssetConnectedTo().removeAll(remConnList);
+                                }
+                                workQueue.remove(0);
+                                visitedQueue.add(asset.getAssetId());
+
+                            } else { // this is a line
+                                if (asset.getConnectionPortB() == 0) {
+
+                                    // new code added on 7/6/2016 
+                                    HashSet<Integer> connectedAssets = asset.getAssetConnectedTo();
+                                    if (connectedAssets != null) {
+                                        Iterator<Integer> iterator = connectedAssets.iterator();
+                                        if (iterator != null) {
+                                            while (iterator.hasNext()) {
+                                                Integer v = iterator.next();
+                                                Asset tempAsset = circuitAssets.get(v);
+                                                if (tempAsset != null) {
+                                                    if (tempAsset.getFeaturetypeid() != 105 && tempAsset.getFeaturetypeid() != 200000 && tempAsset.getFeaturetypeid() != 300000) {
+                                                        if (tempAsset.getConnectionPortA() != 0 && asset.getConnectionPortA() != tempAsset.getConnectionPortA()) {
+                                                            asset.setConnectionPortB(tempAsset.getConnectionPortA());
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    // end of new code 
+                                    if (asset.getConnectionPortB() == 0) {
+                                        asset.setConnectionPortB(tempPort);
+                                        tempPort++;
+                                    }
+                                    //logger.info("Set connection portB =" + asset.getConnectionPortB() + " for asset id = " + asset.getAssetId());
+                                }
+
+                                //logger.info("Line assset " + asset.getAssetId() + " , connection portA =" + asset.getConnectionPortA() + " connection PortB=" + asset.getConnectionPortB());
+                                HashSet<Integer> connectedAssets = asset.getAssetConnectedTo();
+                                Iterator<Integer> iterator = connectedAssets.iterator();
+                                while (iterator.hasNext()) {
+                                    Integer v = iterator.next();
+                                    /*if (v == 7325413 || v == 7325378 || v == 8297060 || v == 7325411) {
+                                     logger.info("break");
+                                     }*/
+
+                                    if (!visitedQueue.contains(v)) {
+
+                                        Asset tempAsset = circuitAssets.get(v);
+                                        if (tempAsset != null) {
+                                            if (tempAsset.getFeaturetypeid() != 105 && tempAsset.getFeaturetypeid() != 200000 && tempAsset.getFeaturetypeid() != 300000) {
+                                                if (tempAsset.getConnectionPortA() == 0) {
+                                                    tempAsset.setConnectionPortA(asset.getConnectionPortB());
+                                                    //logger.info("Set connection portA =" + tempAsset.getConnectionPortA() + " for asset id = " + tempAsset.getAssetId());
+                                                    // totally new code on 7/1 that will create problems
+                                                    HashSet<Integer> pointConnectedAssets = tempAsset.getAssetConnectedTo();
+                                                    if (pointConnectedAssets != null) {
+                                                        Iterator<Integer> pIterator = pointConnectedAssets.iterator();
+                                                        while (pIterator.hasNext()) {
+                                                            Integer j = pIterator.next();
+                                                            Asset tAsset = circuitAssets.get(j);
+                                                            if (tAsset != null) {
+                                                                if (tAsset.getFeaturetypeid() == 105) {
+                                                                    if (tAsset.getConnectionPortA() == 0 && tAsset.getConnectionPortB() != 0) {
+                                                                        if (tempAsset.getConnectionPortA() != tAsset.getConnectionPortB()) {
+                                                                            tAsset.setConnectionPortA(tempAsset.getConnectionPortA());
+                                                                        }
+                                                                    }
+                                                                    if (tAsset.getConnectionPortA() != 0 && tAsset.getConnectionPortB() == 0) {
+                                                                        if (tempAsset.getConnectionPortA() != tAsset.getConnectionPortA()) {
+                                                                            tAsset.setConnectionPortB(tempAsset.getConnectionPortA());
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+
+                                                    /// end of this stupid new code
+                                                } else {
+                                                    //logger.info("*****************************I dont think this should have happened ,line asset is connected to point asset = " + tempAsset.getAssetId() + " whose connection portA is not blank" );
+                                                }
+                                            } else {
+                                                if (tempAsset.getConnectionPortA() == 0 || (tempAsset.getConnectionPortA() == asset.getConnectionPortB())) {
+                                                    tempAsset.setConnectionPortA(asset.getConnectionPortB());
+                                                    //logger.info("Set connection portA =" + tempAsset.getConnectionPortA() + " for asset id = " + tempAsset.getAssetId());
+                                                } else if (tempAsset.getConnectionPortA() == asset.getConnectionPortA()) {
+                                                    // this entire if statement was added on 7/1/
+                                                } else if (tempAsset.getConnectionPortB() == 0) {
+                                                    // this was added on 7/1/2016
+                                                    tempAsset.setConnectionPortB(asset.getConnectionPortB());
+                                                    //logger.info("!@#$% this was something weird, test the fid" + tempAsset.getAssetId());
+                                                } else {
+                                                    //logger.info("&*&*&*&*&* There is something is really really wrong here, check the fid" + tempAsset.getAssetId());
+                                                }
+                                            }
+                                            if (workQueue.contains(tempAsset.getAssetId()) == false && visitedQueue.contains(tempAsset.getAssetId()) == false && tempAsset.getFeaturetypeid() != 300000 && tempAsset.getFeaturetypeid() != 200000) {
+
+                                                if (openPoints.contains(tempAsset.getAssetId()) == false) {
+                                                    workQueue.add(tempAsset.getAssetId());
+                                                } else {
+                                                    tempAsset.setOpenPointCircuitFids(circuitBreakerFid);
+                                                }
+
+                                            }
+                                        }
+                                    }
+                                }
+                                workQueue.remove(0);
+                                visitedQueue.add(asset.getAssetId());
+                            }
+                        } else {
+                            if (workQueue.size() > 0) {
+                                workQueue.remove(0);
+                            }
+                        }
+
+                    }
+
+                }
+            }
+
+        } catch (Exception e) {
+            logger.info("got an error in setting connectivity port" + e);
+        }
+
+    }
+
+    private void SetPortForOpenPoint(HashMap<Integer, Asset> circuitAssets, HashSet<Integer> openPoints) {
+        try {
+
+            for (Integer key : openPoints) {
+                Asset openPointAsset = circuitAssets.get(key);
+                if (openPointAsset != null) {
+                    openPointAsset.setConnectionPortA(tempPort);
+                    tempPort++;
+                    //logger.info(openPointAsset.getAssetId() + " is the open point with the connection port of " + openPointAsset.getConnectionPortA());
+                    HashSet<Integer> connectedAssets = openPointAsset.getAssetConnectedTo();
+                    if (connectedAssets != null) {
+                        Iterator<Integer> iterator = connectedAssets.iterator();
+                        while (iterator.hasNext()) {
+                            Integer v = iterator.next();
+                            Asset connectedAsset = circuitAssets.get(v);
+                            if (connectedAsset != null) {
+                                if (connectedAsset.getFeaturetypeid() == 105) {
+                                    connectedAsset.setConnectionPortB(openPointAsset.getConnectionPortA());
+                                    //logger.info(connectedAsset.getAssetId() + " is the line connected to open point with the connection port B of " + openPointAsset.getConnectionPortA());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.info("got an error in setting connectivity port" + e);
+        }
+    }
+
+    private void GetAttributesForCables(String assetToQuery, HashMap<Integer, Asset> assetMaster) {
+        //logger.info("Thread starting");
+        try (Connection con = DBConnection.getConnectionToPG();
+                Statement connectionGeomStmt = con.createStatement();) {
+
+            String connectionLineGeomQuery = "SELECT fid, circuit, fid1, fid2, sotagged, wafid1, wafid2, status, primarytype, \n"
+                    + "       const, encased, wires, conductor, phase, neutral, div, seg, volt, \n"
+                    + "       rehab, cadlength, subseg, currentdstat, insultype, insulsize, \n"
+                    + "       custowned, condsize, condmat, installyear, rehabyear, rebuildyear, \n"
+                    + "       manufacturer, conduits, conduitsize, neutralsize, neutralmat, \n"
+                    + "       type\n"
+                    + "FROM asset_ed.ed_primary where fid in (" + assetToQuery + ")";
+
+            //logger.info(connectionLineGeomQuery);
+            
+            ResultSet rs = connectionGeomStmt.executeQuery(connectionLineGeomQuery);
+            rs = connectionGeomStmt.executeQuery(connectionLineGeomQuery);
+            while (rs.next()) {
+                int fid = rs.getInt("fid");
+                //logger.info(fid);
+                Asset asset = assetMaster.get(fid);
+                if (asset != null) {
+
+                    //asset.setCircuit(circuit);
+                    //asset.setNmsAttributes("fid", String.valueOf(fid));
+                    asset.setNmsAttributes("fid", String.valueOf(fid));
+                    asset.setNmsAttributes("featuretypeid", "105");
+                    asset.setNmsAttributes("featuretypename", "ED_Primary");
+
+                    String circuit = rs.getString("circuit");
+                    if (circuit.equalsIgnoreCase("L100-00/00-34")) {
+                          circuit = "L6-00/00-34";
+                    }                    
+                    asset.setCircuit(circuit);
+                    asset.setNmsAttributes("circuit", circuit);
+
+                    int fid1 = rs.getInt("fid1");
+                    asset.setNmsAttributes("fid1", Integer.toString(fid1));
+
+                    int fid2 = rs.getInt("fid2");
+                    asset.setNmsAttributes("fid2", Integer.toString(fid2));
+
+                    boolean sotagged = rs.getBoolean("sotagged");
+                    asset.setNmsAttributes("sotagged", String.valueOf(sotagged));
+
+                    int wafid1 = rs.getInt("wafid1");
+                    asset.setNmsAttributes("wafid1", Integer.toString(wafid1));
+
+                    int wafid2 = rs.getInt("wafid2");
+                    asset.setNmsAttributes("wafid2", Integer.toString(wafid2));
+
+                    String status = rs.getString("status");
+                    asset.setNmsAttributes("status", status);
+
+                    String primarytype = rs.getString("primarytype");
+                    asset.setNmsAttributes("primarytype", primarytype);
+
+                    String construction = rs.getString("const");
+                    asset.setNmsAttributes("const", construction);
+
+                    String encased = rs.getString("encased");
+                    asset.setNmsAttributes("encased", encased);
+
+                    int wires = rs.getInt("wires");
+                    asset.setNmsAttributes("wires", Integer.toString(wires));
+
+                    String conductor = rs.getString("conductor");
+                    asset.setNmsAttributes("conductor", conductor);
+
+                    int phase = rs.getInt("phase");
+                    asset.setNmsAttributes("phase", Integer.toString(phase));
+
+                    int neutral = rs.getInt("neutral");
+                    asset.setNmsAttributes("neutral", Integer.toString(neutral));
+
+                    int div = rs.getInt("div");
+                    asset.setNmsAttributes("div", Integer.toString(div));
+
+                    String seg = rs.getString("seg");
+                    asset.setNmsAttributes("seg", seg);
+
+                    double volt = rs.getFloat("volt");
+                    //asset.setNmsAttributes("volt", String.valueOf(volt));
+                    asset.setNmsAttributes("volt", String.format("%.2f", volt));
+
+                    int rehab = rs.getInt("rehab");
+                    asset.setNmsAttributes("rehab", Integer.toString(rehab));
+
+                    double cadlength = rs.getDouble("cadlength");
+                    asset.setNmsAttributes("cadlength", String.valueOf(cadlength));
+
+                    String subSeg = rs.getString("subseg");
+                    asset.setNmsAttributes("subSegment", subSeg);
+
+                    boolean custowned = rs.getBoolean("custowned");
+                    asset.setNmsAttributes("custowned", String.valueOf(custowned));
+
+                    String condsize = rs.getString("condsize");
+                    asset.setNmsAttributes("condsize", condsize);
+
+                    String condmat = rs.getString("condmat");
+                    asset.setNmsAttributes("condmat", condmat);
+
+                    int installyear = rs.getInt("installyear");
+                    asset.setNmsAttributes("installyear", Integer.toString(installyear));
+
+                    int rehabyear = rs.getInt("rehabyear");
+                    asset.setNmsAttributes("rehabyear", Integer.toString(rehabyear));
+
+                    int rebuildyear = rs.getInt("rebuildyear");
+                    asset.setNmsAttributes("rebuildyear", Integer.toString(rebuildyear));
+
+                    String manufacturer = rs.getString("manufacturer");
+                    asset.setNmsAttributes("manufacturer", manufacturer);
+
+                    int conduits = rs.getInt("conduits");
+                    asset.setNmsAttributes("conduits", Integer.toString(conduits));
+
+                    
+                    String conduitsize = rs.getString("conduitsize");                    
+                    if(conduitsize != null)
+                    {
+                        conduitsize = conduitsize.replace("\"", "\\\"");
+                    }
+                    asset.setNmsAttributes("conduitsize", conduitsize);
+
+                    String neutralsize = rs.getString("neutralsize");
+                    asset.setNmsAttributes("neutralsize", neutralsize);
+
+                    String neutralmat = rs.getString("neutralmat");
+                    asset.setNmsAttributes("neutralmat", neutralmat);
+
+                    String type = rs.getString("type");
+                    asset.setNmsAttributes("type", type);
+
+                    String insultype = rs.getString("insultype");
+                    asset.setNmsAttributes("insultype", insultype);
+
+                    int insulsize = rs.getInt("insulsize");
+                    asset.setNmsAttributes("insulsize", Integer.toString(insulsize));
+
+                }
+
+            }
+            rs.close();
+
+        } catch (Exception e) {
+            logger.error(e.getMessage());            
+        }
+
+    }
+
+}
+====================================================================================
+
+ATTRIBUTE[ED_Primary.fid1]="4508589";
+ATTRIBUTE[ED_Primary.status]="EX";
+};
+ADD ED_Primary 8090980{
+PORT_A=368235;
+PORT_B=368268;
+DIAGRAM[LINESTRING] = {
+HEIGHT =  0;
+ANGLE = 0.0;
+SCALE = 1;
+GEOMETRY = {
+
 
