@@ -1,4 +1,18 @@
 
+
+
+We checked the mp file and found that the issue seemed to be with the connections on the conductor with FID=138122031.
+
+ This conductor which should have been connected to the supply switch from above (49622926) on one port and the three conductors 8090929, 8090918, and 8090900 
+on the other port was connected to one of the conductors on one port (I think 8090918) and the other two conductors on the other port (I think 8090929 and 8090900).  
+It was NOT connected to the transformer supply switch 49622926 at all as it should have been.
+
+I manually changed the 5-10-34.mp file to fix the connectivity.  We rebuilt and that fixed the issue.  This modified mp file is in $HOME/pds or OROMSGS.
+
+Can you please send me the modified file(5-10-34.mp) so that I can compare it with the generated file and check the difference and do some code analysis for the difference.
+
+
+
 /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
@@ -1189,5 +1203,6 @@ HEIGHT =  0;
 ANGLE = 0.0;
 SCALE = 1;
 GEOMETRY = {
+
 
 
