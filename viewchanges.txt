@@ -1,0 +1,140 @@
+-- View: nmsmodelextract.circuitschanged_fornmsfileextract
+
+-- DROP VIEW nmsmodelextract.circuitschanged_fornmsfileextract;
+
+CREATE OR REPLACE VIEW nmsmodelextract.circuitschanged_fornmsfileextract
+ AS
+ SELECT ed_circuitbreaker.fid,
+    ed_circuitbreaker.circuit
+   FROM asset_ed.ed_circuitbreaker
+  WHERE (ed_circuitbreaker.circuit::text IN ( SELECT DISTINCT c.circuit
+           FROM asset_ed.circuit_feature c
+             JOIN ed.audit a ON c.fid = a.fid
+          WHERE c.circuit IS NOT NULL AND (c.circuit::text <> ALL (ARRAY['129M-1-13'::character varying::text, '129M-2-13'::character varying::text, '128M-1-13'::character varying::text, '128M-2-13'::character varying::text, '44-5A-13'::character varying::text, '44-5B-13'::character varying::text, '44-5-13'::character varying::text, '44-3A-13'::character varying::text, '44-3B-13'::character varying::text, '44-3-13'::character varying::text])) AND a.date > (now() - '30:00:00'::interval)))
+UNION
+ SELECT DISTINCT b.fid,
+    p.circuit
+   FROM asset_ed.ed_primary p
+     JOIN ed.connection c ON p.fid = c.fida AND (c.fidb IN ( SELECT DISTINCT a.fid
+           FROM ed.audit a
+             JOIN asset_ed.ed_ohd o ON a.fid = o.fid
+          WHERE (now() - a.date) <= '30:00:00'::interval AND o.designdstat::text = 'Open'::text))
+     JOIN asset_ed.ed_circuitbreaker b ON p.circuit::text = b.circuit::text AND (p.circuit::text <> ALL (ARRAY['129M-1-13'::character varying::text, '129M-2-13'::character varying::text, '128M-1-13'::character varying::text, '128M-2-13'::character varying::text, '44-5A-13'::character varying::text, '44-5B-13'::character varying::text, '44-5-13'::character varying::text, '44-3A-13'::character varying::text, '44-3B-13'::character varying::text, '44-3-13'::character varying::text]))
+UNION
+ SELECT 9395 AS fid,
+    '44-5-13'::character varying(25) AS circuit
+   FROM asset_ed.ed_circuitbreaker
+  WHERE (ed_circuitbreaker.circuit::text IN ( SELECT DISTINCT c.circuit
+           FROM asset_ed.circuit_feature c
+             JOIN ed.audit a ON c.fid = a.fid
+          WHERE (c.circuit::text = ANY (ARRAY['44-5A-13'::character varying::text, '44-5B-13'::character varying::text])) AND a.date > (now() - '30:00:00'::interval)))
+UNION
+ SELECT 1931 AS fid,
+    '44-3-13'::character varying(25) AS circuit
+   FROM asset_ed.ed_circuitbreaker
+  WHERE (ed_circuitbreaker.circuit::text IN ( SELECT DISTINCT c.circuit
+           FROM asset_ed.circuit_feature c
+             JOIN ed.audit a ON c.fid = a.fid
+          WHERE (c.circuit::text = ANY (ARRAY['44-3A-13'::character varying::text, '44-3B-13'::character varying::text])) AND a.date > (now() - '30:00:00'::interval)))
+UNION
+ SELECT 9395 AS fid,
+    '44-5-13'::character varying(25) AS circuit
+   FROM asset_ed.ed_primary p
+     JOIN ed.connection c ON p.fid = c.fida AND (c.fidb IN ( SELECT DISTINCT a.fid
+           FROM ed.audit a
+             JOIN asset_ed.ed_ohd o ON a.fid = o.fid
+          WHERE (now() - a.date) <= '30:00:00'::interval AND o.designdstat::text = 'Open'::text))
+     JOIN asset_ed.ed_circuitbreaker b ON p.circuit::text = b.circuit::text
+  WHERE p.circuit::text = ANY (ARRAY['44-5A-13'::character varying::text, '44-5B-13'::character varying::text])
+UNION
+ SELECT 1931 AS fid,
+    '44-3-13'::character varying(25) AS circuit
+   FROM asset_ed.ed_primary p
+     JOIN ed.connection c ON p.fid = c.fida AND (c.fidb IN ( SELECT DISTINCT a.fid
+           FROM ed.audit a
+             JOIN asset_ed.ed_ohd o ON a.fid = o.fid
+          WHERE (now() - a.date) <= '30:00:00'::interval AND o.designdstat::text = 'Open'::text))
+     JOIN asset_ed.ed_circuitbreaker b ON p.circuit::text = b.circuit::text
+  WHERE p.circuit::text = ANY (ARRAY['44-3A-13'::character varying::text, '44-3B-13'::character varying::text])
+UNION
+ SELECT 1811 AS fid,
+    '3-1-34'::character varying(25) AS circuit
+   FROM asset_ed.ed_circuitbreaker
+  WHERE (ed_circuitbreaker.circuit::text IN ( SELECT DISTINCT c.circuit
+           FROM asset_ed.circuit_feature c
+             JOIN ed.audit a ON c.fid = a.fid
+          WHERE (c.circuit::text = ANY (ARRAY['3-1N-34'::character varying::text, '3-1S-34'::character varying::text])) AND a.date > (now() - '30:00:00'::interval)))
+UNION
+ SELECT 1811 AS fid,
+    '3-1-34'::character varying(25) AS circuit
+   FROM asset_ed.ed_primary p
+     JOIN ed.connection c ON p.fid = c.fida AND (c.fidb IN ( SELECT DISTINCT a.fid
+           FROM ed.audit a
+             JOIN asset_ed.ed_ohd o ON a.fid = o.fid
+          WHERE (now() - a.date) <= '30:00:00'::interval AND o.designdstat::text = 'Open'::text))
+     JOIN asset_ed.ed_circuitbreaker b ON p.circuit::text = b.circuit::text
+  WHERE p.circuit::text = ANY (ARRAY['3-1N-34'::character varying::text, '3-1S-34'::character varying::text])
+UNION
+ SELECT 129318902 AS fid,
+    '128-M1-13'::character varying(25) AS circuit
+   FROM asset_ed.ed_circuitbreaker
+  WHERE (ed_circuitbreaker.circuit::text IN ( SELECT DISTINCT c.circuit
+           FROM asset_ed.circuit_feature c
+             JOIN ed.audit a ON c.fid = a.fid
+          WHERE (c.circuit::text = ANY (ARRAY['128M-1-13'::character varying::text, '128M-2-13'::character varying::text])) AND a.date > (now() - '30:00:00'::interval)))
+UNION
+ SELECT 129318902 AS fid,
+    '128-M1-13'::character varying(25) AS circuit
+   FROM asset_ed.ed_primary p
+     JOIN ed.connection c ON p.fid = c.fida AND (c.fidb IN ( SELECT DISTINCT a.fid
+           FROM ed.audit a
+             JOIN asset_ed.ed_ohd o ON a.fid = o.fid
+          WHERE (now() - a.date) <= '30:00:00'::interval AND o.designdstat::text = 'Open'::text))
+     JOIN asset_ed.ed_circuitbreaker b ON p.circuit::text = b.circuit::text
+  WHERE p.circuit::text = ANY (ARRAY['128M-1-13'::character varying::text, '128M-2-13'::character varying::text])
+UNION
+ SELECT 136020478 AS fid,
+    '129-M6-13'::character varying(25) AS circuit
+   FROM asset_ed.ed_circuitbreaker
+  WHERE (ed_circuitbreaker.circuit::text IN ( SELECT DISTINCT c.circuit
+           FROM asset_ed.circuit_feature c
+             JOIN ed.audit a ON c.fid = a.fid
+          WHERE (c.circuit::text = ANY (ARRAY['129M-1-13'::character varying::text, '129M-2-13'::character varying::text])) AND a.date > (now() - '30:00:00'::interval)))
+UNION
+ SELECT 136020478 AS fid,
+    '129-M6-13'::character varying(25) AS circuit
+   FROM asset_ed.ed_primary p
+     JOIN ed.connection c ON p.fid = c.fida AND (c.fidb IN ( SELECT DISTINCT a.fid
+           FROM ed.audit a
+             JOIN asset_ed.ed_ohd o ON a.fid = o.fid
+          WHERE (now() - a.date) <= '30:00:00'::interval AND o.designdstat::text = 'Open'::text))
+     JOIN asset_ed.ed_circuitbreaker b ON p.circuit::text = b.circuit::text
+  WHERE p.circuit::text = ANY (ARRAY['129M-1-13'::character varying::text, '129M-2-13'::character varying::text])
+UNION
+ SELECT 1912 AS fid,
+    '5-3-34'::character varying(25) AS circuit
+   FROM asset_ed.ed_circuitbreaker
+  WHERE (ed_circuitbreaker.circuit::text IN ( SELECT DISTINCT c.circuit
+           FROM asset_ed.circuit_feature c
+             JOIN ed.audit a ON c.fid = a.fid
+          WHERE (c.circuit::text = ANY (ARRAY['9-T1-13'::character varying::text, '9-T5-13'::character varying::text])) AND a.date > (now() - '30:00:00'::interval)))
+UNION
+ SELECT 1912 AS fid,
+    '5-3-34'::character varying(25) AS circuit
+   FROM asset_ed.ed_primary p
+     JOIN ed.connection c ON p.fid = c.fida AND (c.fidb IN ( SELECT DISTINCT a.fid
+           FROM ed.audit a
+             JOIN asset_ed.ed_ohd o ON a.fid = o.fid
+          WHERE (now() - a.date) <= '30:00:00'::interval AND o.designdstat::text = 'Open'::text))
+     JOIN asset_ed.ed_circuitbreaker b ON p.circuit::text = b.circuit::text
+  WHERE p.circuit::text = ANY (ARRAY['9-T1-13'::character varying::text, '9-T5-13'::character varying::text])
+  ORDER BY 2;
+
+ALTER TABLE nmsmodelextract.circuitschanged_fornmsfileextract
+    OWNER TO dms;
+
+GRANT ALL ON TABLE nmsmodelextract.circuitschanged_fornmsfileextract TO dms;
+GRANT SELECT ON TABLE nmsmodelextract.circuitschanged_fornmsfileextract TO henryth;
+GRANT SELECT ON TABLE nmsmodelextract.circuitschanged_fornmsfileextract TO read_only_role;
+GRANT ALL ON TABLE nmsmodelextract.circuitschanged_fornmsfileextract TO read_write;
+
