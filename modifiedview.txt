@@ -1,0 +1,116 @@
+CREATE OR REPLACE FUNCTION nmsmodelextract.circuitschanged_fornmsfileextract(
+    p_minutes INTEGER
+)
+RETURNS TABLE (
+    fid BIGINT,
+    circuit VARCHAR(25)
+)
+LANGUAGE sql
+AS
+$$
+
+SELECT ed_circuitbreaker.fid,
+       ed_circuitbreaker.circuit
+FROM asset_ed.ed_circuitbreaker
+WHERE ed_circuitbreaker.circuit::text IN (
+    SELECT DISTINCT c.circuit
+    FROM asset_ed.circuit_feature c
+    JOIN ed.audit a ON c.fid = a.fid
+    WHERE c.circuit IS NOT NULL
+      AND (c.circuit::text <> ALL (ARRAY[
+          '129M-1-13','129M-2-13','128M-1-13','128M-2-13',
+          '44-5A-13','44-5B-13','44-5-13',
+          '44-3A-13','44-3B-13','44-3-13'
+      ]))
+      AND a.date > (now() - (p_minutes || ' minutes')::interval)
+)
+
+UNION
+
+SELECT DISTINCT b.fid,
+       p.circuit
+FROM asset_ed.ed_primary p
+JOIN ed.connection c ON p.fid = c.fida
+JOIN asset_ed.ed_circuitbreaker b ON p.circuit::text = b.circuit::text
+WHERE c.fidb IN (
+    SELECT DISTINCT a.fid
+    FROM ed.audit a
+    JOIN asset_ed.ed_ohd o ON a.fid = o.fid
+    WHERE (now() - a.date) <= (p_minutes || ' minutes')::interval
+      AND o.designdstat::text = 'Open'
+)
+AND (p.circuit::text <> ALL (ARRAY[
+    '129M-1-13','129M-2-13','128M-1-13','128M-2-13',
+    '44-5A-13','44-5B-13','44-5-13',
+    '44-3A-13','44-3B-13','44-3-13'
+]))
+
+UNION
+SELECT 9395, '44-5-13'
+FROM asset_ed.ed_circuitbreaker
+WHERE ed_circuitbreaker.circuit::text IN (
+    SELECT DISTINCT c.circuit
+    FROM asset_ed.circuit_feature c
+    JOIN ed.audit a ON c.fid = a.fid
+    WHERE c.circuit::text = ANY (ARRAY['44-5A-13','44-5B-13'])
+      AND a.date > (now() - (p_minutes || ' minutes')::interval)
+)
+
+UNION
+SELECT 1931, '44-3-13'
+FROM asset_ed.ed_circuitbreaker
+WHERE ed_circuitbreaker.circuit::text IN (
+    SELECT DISTINCT c.circuit
+    FROM asset_ed.circuit_feature c
+    JOIN ed.audit a ON c.fid = a.fid
+    WHERE c.circuit::text = ANY (ARRAY['44-3A-13','44-3B-13'])
+      AND a.date > (now() - (p_minutes || ' minutes')::interval)
+)
+
+UNION
+SELECT 1811, '3-1-34'
+FROM asset_ed.ed_circuitbreaker
+WHERE ed_circuitbreaker.circuit::text IN (
+    SELECT DISTINCT c.circuit
+    FROM asset_ed.circuit_feature c
+    JOIN ed.audit a ON c.fid = a.fid
+    WHERE c.circuit::text = ANY (ARRAY['3-1N-34','3-1S-34'])
+      AND a.date > (now() - (p_minutes || ' minutes')::interval)
+)
+
+UNION
+SELECT 129318902, '128-M1-13'
+FROM asset_ed.ed_circuitbreaker
+WHERE ed_circuitbreaker.circuit::text IN (
+    SELECT DISTINCT c.circuit
+    FROM asset_ed.circuit_feature c
+    JOIN ed.audit a ON c.fid = a.fid
+    WHERE c.circuit::text = ANY (ARRAY['128M-1-13','128M-2-13'])
+      AND a.date > (now() - (p_minutes || ' minutes')::interval)
+)
+
+UNION
+SELECT 136020478, '129-M6-13'
+FROM asset_ed.ed_circuitbreaker
+WHERE ed_circuitbreaker.circuit::text IN (
+    SELECT DISTINCT c.circuit
+    FROM asset_ed.circuit_feature c
+    JOIN ed.audit a ON c.fid = a.fid
+    WHERE c.circuit::text = ANY (ARRAY['129M-1-13','129M-2-13'])
+      AND a.date > (now() - (p_minutes || ' minutes')::interval)
+)
+
+UNION
+SELECT 1912, '5-3-34'
+FROM asset_ed.ed_circuitbreaker
+WHERE ed_circuitbreaker.circuit::text IN (
+    SELECT DISTINCT c.circuit
+    FROM asset_ed.circuit_feature c
+    JOIN ed.audit a ON c.fid = a.fid
+    WHERE c.circuit::text = ANY (ARRAY['9-T1-13','9-T5-13'])
+      AND a.date > (now() - (p_minutes || ' minutes')::interval)
+)
+
+ORDER BY 2;
+
+$$;
